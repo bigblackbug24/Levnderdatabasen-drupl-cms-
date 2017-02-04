@@ -1,0 +1,424 @@
+<?php
+	
+	function topleverandorsdata_menu() 
+	{
+		$items = array();
+	
+		$items['topleverandors/%/%/%'] = array(
+			'title' => '',
+			'description' => 'Get Top 100 Leverandors of Fylke/Kommune',
+			'page callback' => 'getTopLevarandor',
+			'page arguments' => array(3),
+			'access arguments' => array('access content'), 
+			'type' => MENU_CALLBACK,
+		);
+				
+		return $items;	
+	}
+	
+	function getTopLevarandor()
+	{
+		$fkId = arg(1);
+		$dataYear = arg(2);
+		$type = arg(3);
+		
+		$dataHtml = NULL;
+		
+		if($type == 'fylke')
+			$dataHtml = show_top_levarandor_by_fylke_id($fkId, $dataYear);
+		elseif($type == 'kommune')
+			$dataHtml = show_top_levarandor_by_kommune_id($fkId, $dataYear);
+		
+		return $dataHtml;	
+	}
+	
+	
+	function show_top_levarandor_by_fylke_id($fylkeId, $dataYear)
+	{
+		global $base_url;
+		global $user;
+
+		$output = NULL;		
+		
+		db_set_active('kommunaldata');	
+		
+		// Get Fylke Basic Information;
+		$query = db_select('fylke', 'A');
+		$query->leftJoin('fylke_innbyggere', 'B', 'A.fylke_id = B.fylke_id AND B.innbygger_year ='.$dataYear);
+		
+		$query->fields('A', array('fylke_id', 'fylke_navn', 'fylke_ordforer_navn', 'fylke_parti', 'fylke_periode', 'fylke_adviser', 'fylke_telefon', 'fylke_kontaktinfo', 'fylke_kontaktinfo', 'fylke_hjemmeside', 'fylke_forretningsadr', 'fylke_forradrpostnr', 'fylke_forradrpoststed', 'fylke_postadresse', 'fylke_ppostnr', 'fylke_ppoststed' ));
+		
+		$query->fields('B', array('innbygger', 'fylke_group'));
+		$query->condition('A.fylke_id', $fylkeId, '=');
+		$fylkeData = $query->execute();
+		
+		db_set_active();
+		
+		$fylkeId = $fylkeName = $fylkeMayor = $fylkeParti = $fylkePeriod = $fylkeAdv = $fylkePhone = $fylkeEmail = $fylkeUrl = NULL;
+		
+		$fylkeGroup = $innbyggerTotal = 0;
+		
+		foreach ($fylkeData as $dataRow) 
+		{
+			$fylkeId = $dataRow->fylke_id;
+			$fylkeName = $dataRow->fylke_navn;
+			$fylkeMayor = $dataRow->fylke_ordforer_navn;
+			$fylkeParti = $dataRow->fylke_parti;
+			$fylkePeriod = $dataRow->fylke_periode;
+			$fylkeAdv = $dataRow->fylke_adviser;
+			$fylkePhone = $dataRow->fylke_telefon;
+			$fylkeEmail = $dataRow->fylke_kontaktinfo;
+			$fylkeUrl = $dataRow->fylke_hjemmeside;
+			$innbyggerTotal = $dataRow->innbygger;
+			$fylkeGroup = $dataRow->fylke_group;	
+			
+			$fylkeForretningsadr = $dataRow->fylke_forretningsadr;	
+			$fylkeForradrpostnr = $dataRow->fylke_forradrpostnr;	
+			$fylkeForradrpoststed = $dataRow->fylke_forradrpoststed;	
+			$fylkePostadresse = $dataRow->fylke_postadresse;	
+			$fylkePpostnr = $dataRow->fylke_ppostnr;	
+			$fylkePpoststed = $dataRow->fylke_ppoststed;		
+
+		}	
+				
+		$logoPath = $base_url."/sites/default/files/komlogo/".$fylkeId.".gif";
+		
+		$output.= '<div class="getUrlData">';
+				
+		$output.= '<div class="right-content">';
+		$output.= '	<div class="logo-widget">';
+		$output.= '		<img src="'.$logoPath.'" title="'.$fylkeName.'" width="75" />';
+		$output.= '		<h1>'.$fylkeName.'</h1>';
+		$output.= '	</div>';
+
+		$output.= '<h3>Offisiell informasjon</h3>';	
+
+		$output.= '	<div class="info-box fylke-result">';
+		$output.= '<a style="float: right; margin-top: -36px; margin-right: -20px;" href="#" data-toggle="tooltip" title="Fylke Kommune Information box"><i class="fa fa-question-circle"></i></a>';
+
+		$output.= '		<div class="inner-box">';
+		
+		$output.= '			<label>';
+		$output.= '				<span style="width:200px;"><strong>Ordf&oslash;rer:</strong></span>';
+		$output.= '				<span>'.$fylkeMayor.' - '.$fylkeParti.' ( '.$fylkePeriod.' ) </span>';
+		$output.= '			</label>';
+		
+		if($user->uid)
+		{
+			$output.= '			<label>';
+			$output.= '				<span><strong>R&aring;dmann:</strong></span>';
+			$output.= '				<span>'.$fylkeAdv.'</span>';
+			$output.= '			</label>';
+		}
+		
+		$output.= '			<label>';
+		$output.= '				<span><strong>E-post:</strong></span>';
+		$output.= '				<span><a href="mailto:'.$fylkeEmail.'">'.$fylkeEmail.'</a></span>';
+		$output.= '			</label>';
+		
+		if($user->uid)
+		{
+			$output.= '			<label>';
+			$output.= '				<span><strong>Telefon:</strong></span>';
+			$output.= '				<span>'.$fylkePhone.'</span>';
+			$output.= '			</label>';
+		}
+			
+		$output.= '			<label>';
+		$output.= '				<span><strong>Hjemmeside:</strong></span>';
+		$output.= '				<span><a href="http://'.$fylkeUrl.'" target="_blank">'.$fylkeUrl.'</a></span>';
+		$output.= '			</label>';
+		
+		$output.= '			<label>';
+		$output.= '				<span><strong>Fylke nr:</strong></span>';
+		$output.= '				<span>'.$fylkeId.'</span>';
+		$output.= '			</label>';
+
+		$output.= '			<label>';
+		$output.= '				<span><strong>Innbyggere:</strong></span>';
+		$output.= '				<span>'.$innbyggerTotal.' ('.$dataYear.')</span>';
+		$output.= '			</label>';
+		$output.= '		</div>';
+		
+		$output.= '		<div class="inner-box">';
+		
+		$output.= '			<label>';
+		$output.= '				<span style="width:200px;"><strong>Forretningsadresse: </strong></span>';
+		$output.= '				<span>'.$fylkeForretningsadr.'</span>';
+		$output.= '			</label>';
+		
+		$output.= '			<label>';
+		$output.= '				<span><strong>Postnr./Poststed:</strong></span>';
+		$output.= '				<span>'.$fylkeForradrpostnr.' / '.$fylkeForradrpoststed.'</span>';
+		$output.= '			</label>';
+		
+		$output.= '			<label>';
+		$output.= '				<span><strong>Postadresse:</strong></span>';
+		$output.= '				<span>'.$fylkePostadresse.'</span>';
+		$output.= '			</label>';
+		
+		$output.= '			<label>';
+		$output.= '				<span><strong>Postnr./Poststed:</strong></span>';
+		$output.= '				<span>'.$fylkePpostnr.' / '.$fylkePpoststed.'</span>';
+		$output.= '			</label>';		
+		$output.= '		</div>';
+
+		$output.= '	</div>';
+		
+		if($user->uid)
+			$output.= getTopSupplierGrid($fylkeId, $dataYear, $fylkeName);
+		
+		$output.= '</div>';	
+		
+		$output.= drupal_render(drupal_get_form('kommunal_data_filter_form'));
+		
+		return $output;
+
+	}
+	
+	function show_top_levarandor_by_kommune_id($kommuneId, $dataYear) 
+	{
+		global $base_url;
+		global $user;
+		
+		$output = NULL;
+				
+		db_set_active('kommunaldata');	
+		
+		// Get kommune Basic Information;
+		$query = db_select('kommune', 'A');
+		$query->join('kommune_innbyggere', 'B', 'A.kommune_id = B.kommune_id AND B.innbygger_year ='.$dataYear);
+		$query->fields('A', array('kommune_id', 'kommune_navn', 'kommune_ordforer', 'kommune_parti', 'kommune_periode', 'kommune_adviser', 'kommune_forretningsadr', '	kommune_forradrpostnr', 'kommune_forradrpoststed', 'kommune_postadresse', '	kommune_ppostnr', 'kommune_ppoststed', 'kummune_telefon', 'kommune_kontaktinfo', 'kommune_kontaktinfo', 'kommune_hjemmeside'));
+		$query->fields('B', array('innbygger', 'kommune_group'));
+		$query->condition('A.kommune_id', $kommuneId, '=');
+		$kommuneData = $query->execute();
+		
+		db_set_active();
+		
+		$kommuneId = $kommuneName = $kommuneMayor = $kommuneParti = $kommunePeriod = $kommuneAdv = $kommunePhone = $kommuneEmail = $kommuneUrl = NULL;
+		
+		$kommuneGroup = $innbyggerTotal = 0;
+		
+		foreach ($kommuneData as $dataRow) 
+		{
+			$kommuneId = $dataRow->kommune_id;
+			$kommuneName = $dataRow->kommune_navn;
+			$kommuneMayor = $dataRow->kommune_ordforer;
+			$kommuneParti = $dataRow->kommune_parti;
+			$kommunePeriod = $dataRow->kommune_periode;
+			$kommuneAdv = $dataRow->kommune_adviser;
+			$kommunePhone = $dataRow->kummune_telefon;
+			$kommuneEmail = $dataRow->kommune_kontaktinfo;
+			$kommuneUrl = $dataRow->kommune_hjemmeside;
+			$innbyggerTotal = $dataRow->innbygger;
+			$kommuneGroup = $dataRow->kommune_group;	
+			
+			$kommuneForretningsadr = $dataRow->kommune_forretningsadr;
+			$kommuneForradrpostnr = $dataRow->kommune_forradrpostnr;
+			$kommuneForradrpoststed = $dataRow->kommune_forradrpoststed;
+			$kommunePostadresse = $dataRow->kommune_postadresse;
+			$kommunePpostnr = $dataRow->kommune_ppostnr;
+			$kommunePpoststed = $dataRow->kommune_ppoststed;			
+
+		}	
+				
+		$logoPath = $base_url."/sites/default/files/komlogo/".$kommuneId.".gif";
+		
+		$output.= '<div class="getUrlData">';		
+		
+		$output.= '<div class="right-content">';
+		$output.= '	<div class="logo-widget">';
+		$output.= '		<img src="'.$logoPath.'" title="'.$kommuneName.'" width="75" />';
+		$output.= '		<h1>'.$kommuneName.'</h1>';
+		$output.= '	</div>';
+
+		$output.= '	<h3>Offisiell informasjon</h3>';
+		$output.= '	<div class="info-box fylke-result">';
+		$output.= '		<div class="inner-box">';
+		$output.= '			<label>';
+		$output.= '				<span style="width:200px;"><strong>Ordf&oslash;rer:</strong></span>';
+		$output.= '				<span>'.$kommuneMayor.' - '.$kommuneParti.' ( '.$kommunePeriod.' ) </span>';
+		$output.= '			</label>';
+
+		if($user->uid)
+		{
+			$output.= '			<label>';
+			$output.= '				<span><strong>R&aring;dmann:</strong></span>';
+			$output.= '				<span>'.$kommuneAdv.'</span>';
+			$output.= '			</label>';
+		}
+
+		$output.= '			<label>';
+		$output.= '				<span><strong>E-post:</strong></span>';
+		$output.= '				<span><a href="mailto:'.$kommuneEmail.'">'.$kommuneEmail.'</a></span>';
+		$output.= '			</label>';
+		
+		if($user->uid)
+		{
+			$output.= '			<label>';
+			$output.= '				<span><strong>Telefon:</strong></span>';
+			$output.= '				<span>'.$kommunePhone.'</span>';
+			$output.= '			</label>';
+		}
+
+		$output.= '			<label>';
+		$output.= '				<span><strong>Hjemmeside:</strong></span>';
+		$output.= '				<span><a href="http://'.$kommuneUrl.'" target="_blank">'.$kommuneUrl.'</a></span>';
+		$output.= '			</label>';
+		
+		$output.= '			<label>';
+		$output.= '				<span><strong>Kommune nr:</strong></span>';
+		$output.= '				<span>'.$kommuneId.'</span>';
+		$output.= '			</label>';
+		$output.= '			<label>';
+		$output.= '				<span><strong>Innbyggere:</strong></span>';
+		$output.= '				<span>'.$innbyggerTotal.' ('.$dataYear.')</span>';
+		$output.= '			</label>';
+		$output.= '		</div>';		
+		
+		$output.= '		<div class="inner-box">';
+		
+		$output.= '			<label>';
+		$output.= '				<span style="width:200px;"><strong>Forretningsadresse: </strong></span>';
+		$output.= '				<span>'.$kommuneForretningsadr.'</span>';
+		$output.= '			</label>';
+		
+		$output.= '			<label>';
+		$output.= '				<span><strong>Postnr./Poststed:</strong></span>';
+		$output.= '				<span>'.$kommuneForradrpostnr.' / '.$kommuneForradrpoststed.'</span>';
+		$output.= '			</label>';
+		
+		$output.= '			<label>';
+		$output.= '				<span><strong>Postadresse:</strong></span>';
+		$output.= '				<span>'.$kommunePostadresse.'</span>';
+		$output.= '			</label>';
+		
+		$output.= '			<label>';
+		$output.= '				<span><strong>Postnr./Poststed:</strong></span>';
+		$output.= '				<span>'.$kommunePpostnr.' / '.$kommunePpoststed.'</span>';
+		$output.= '			</label>';
+		
+		$output.= '		</div>';
+		$output.= '	</div>';
+		
+		if($user->uid)
+			$output.= getTopSupplierGrid($kommuneId, $dataYear, $kommuneName);
+
+		$output.= '</div>';
+
+		$output.= drupal_render(drupal_get_form('kommunal_data_filter_form'));
+		
+				
+		return $output;
+	
+	}
+	
+	function getTopSupplierGrid($fkId, $dataYear, $kommuneName)
+	{
+		global $base_url;  
+		
+		db_set_active('kommunaldata');	
+		
+		// GET Data Last Year
+		$query = db_select('leverandor_data', 'A');
+		$query->fields('A', array('ld_orgnr', 'ld_revenue'));
+		$query->condition('A.ld_kommune_id', $fkId);
+		$query->condition('A.ld_data_year', ($dataYear-1));		
+		$query->orderBy('A.ld_revenue', 'DESC');
+		
+		$arrkommuneSupplierDataLastYear = $query->execute()->fetchAll();
+		
+		// Get Data Current Year
+		$query = db_select('leverandor_data', 'A');
+		$query->fields('A', array('ld_orgnr', 'ld_orgnavn', 'ld_group', 'ld_group_name', 'ld_subclass', 'ld_subclass_name', 'ld_revenue'));
+		$query->condition('A.ld_kommune_id', $fkId);
+		$query->condition('A.ld_data_year', $dataYear);	
+		$query->orderBy('A.ld_revenue', 'DESC');
+		$query->range(0, 100);
+		
+		$arrkommuneSupplierData = $query->execute()->fetchAll();
+;
+				
+		db_set_active();
+		
+		$kommuneDataLastYear = array();
+		foreach($arrkommuneSupplierDataLastYear as $arrRowData)
+		{
+			$kommuneDataLastYear[$arrRowData->ld_orgnr] = $arrRowData->ld_revenue;
+		}
+				
+		$output.= '<h3>De 100 Leverand&oslash;rer til '.$kommuneName.'</h3>';
+
+		$output.= '	<table class="table-view" cellpadding="0" cellspacing="0" width="100%">';
+		$output.= '		<thead>';
+		$output.= '			<tr>';
+		$output.= '				<th width="13%">Leverand&oslash;r</th>';
+		$output.= '				<th width="13%">Hovedbransjer</th>';
+		$output.= '				<th width="13%">Bransje</th>';
+		$output.= '				<th width="15%" class="rightalign">Kj&oslash;pt '.$dataYear.' <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Bel&oslash;p i hele 1000"><i class="fa fa-question-circle"></i></a></th>';
+		$output.= '				<th width="20%" class="rightalign">Gj. snitt for bransje <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Bel&oslash;p i hele 1000"><i class="fa fa-question-circle"></i></a></th>';
+		$output.= '				<th width="15%" class="rightalign">Endring (%) <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Endring i % fra '.($dataYear-1). '"><i class="fa fa-question-circle"></i></a></th>';
+		$output.= '			</tr>';
+		$output.= '		</thead>';
+		$output.= '	<tbody>';
+		
+		$dataForNextGrid = array();
+		
+		$mygrid = NULL;
+		
+		if(!empty($arrkommuneSupplierData))
+		{
+			$num = 1;
+			foreach($arrkommuneSupplierData as $arrSupData)
+			{
+				
+				//////////////////////////////////////////////////////////
+
+				db_set_active('kommunaldata');	
+
+				$query = db_select('subclass_leverandor_total', 'A');
+				$query->fields('A', array('sc_total_revenue', 'sc_total_company'));
+				$query->condition('A.sc_subclass', $arrSupData->ld_subclass);
+				$query->condition('A.sc_data_year', $dataYear);	
+		
+				$arrSubclassInGroupData = $query->execute()->fetchAll();
+
+				db_set_active();
+
+				$groupAverage = 0;
+
+				foreach ($arrSubclassInGroupData as $ingroup) {
+					$subclassAverage = $ingroup->sc_total_revenue/$ingroup->sc_total_company;
+				}
+
+				//////////////////////////////////////////////////////////
+				
+				$kommuneOrgName = $arrSupData->ld_orgnavn;
+				$kommuneTotalInvoiceCurrYear = $arrSupData->ld_revenue;
+				
+				$kommuneTotalInvoiceLastYear = $kommuneDataLastYear[$arrSupData->ld_orgnr];
+				
+				$kommuneIncreasePersentage = numberFormat(((($arrSupData->ld_revenue - $kommuneDataLastYear[$arrSupData->ld_orgnr]) / ($arrSupData->ld_revenue + $kommuneDataLastYear[$arrSupData->ld_orgnr])) * 100), 0);
+							
+				$bgcolor = ($num % 2 === 0) ? 'class="rowBackground"' : NULL;
+
+				$output.= '<tr '.$bgcolor.' >';
+				$output.= '	<td><a href="'.$base_url.'/levrandordata/'.$arrSupData->ld_orgnr.'/'.$dataYear.'" target="_blank">'.$num.' - '.$kommuneOrgName.' <span class="glyphicon glyphicon-link" aria-hidden="true"></span></a></td>';
+				$output.= '	<td><a href="'.$base_url.'/groupdatacard/'.$arrSupData->ld_group.'/'.$dataYear.'" target="_blank">'.$arrSupData->ld_group_name.'<span class="glyphicon glyphicon-link" aria-hidden="true"></span></a></td>';
+				$output.= '	<td>'.$arrSupData->ld_subclass_name.'</td>';
+				$output.= '	<td class="rightalign">'.numberFormat($kommuneTotalInvoiceCurrYear/1000, 0).'</td>';
+				$output.= '	<td class="rightalign">'.numberFormat($subclassAverage/1000, 0).'</td>';
+				$output.= '	<td class="rightalign">'.$kommuneIncreasePersentage.' %</td>';
+				$output.= '</tr>';
+				$num++;
+			}
+		}
+
+		$output.= '	</tbody>';
+		$output.= ' </table>';
+		
+		
+		return $output;
+	}
+	
+	

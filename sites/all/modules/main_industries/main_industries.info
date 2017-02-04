@@ -1,0 +1,12 @@
+name = main_industries
+description =main_industries detail module
+package = Kommunal Modules
+version = VERSION
+core = 7.x
+files[] = main_industries.module
+
+
+; Information added by drupal.org packaging script on 2010-03-21
+version = "7.0-alpha3"
+project = "drupal"
+datestamp = "1269192313"

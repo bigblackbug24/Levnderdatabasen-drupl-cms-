@@ -1,0 +1,789 @@
+<?php
+	
+	function groupdata_menu() 
+	{
+		$items = array();
+
+		$items['groupdata'] = array(
+			'type' => MENU_CALLBACK,
+			'title' => t(''),
+			'page callback' => 'drupal_get_form',
+			'access arguments' => array('access content'),
+			'page arguments' => array('group_data_filter_form'),
+		);
+		
+		$items['groupdatacard/%/%'] = array(
+			'type' => MENU_CALLBACK,
+			'title' => t(''),
+			'page callback' => 'getgroupDataByGroupId',
+			'access arguments' => array('access content'),
+			'page arguments' => array(2),
+		);
+		
+		return $items;	
+	}
+	
+	function group_data_filter_form($form, &$form_state) 
+	{
+		
+		$form['#redirect'] = false;
+
+		$form['#action'] = 'groupdata';
+		
+		$yoptions = getDataYear();
+				
+		$form['datayear'] = array(
+			'#type' => 'select',
+			'#title' => t('&Aring;r: '),
+			'#default_value' => NULL,
+			'#options' => $yoptions
+		);
+		
+		$groupCodeList = getGroupSubclassData(3);
+
+		$form['groupclass'] = array(
+			'#type' => 'select',
+			'#title' => t('Hovedbransjer: <a href="#" data-toggle="tooltip" title="Velg en hovedbransje"><i class="fa fa-question-circle"></i></a>'),
+			'#options' => $groupCodeList,
+			'#empty_option' => true,
+			'#multiple' => FALSE,
+			'#id' => 'groupctokenize',
+			'#attributes' => array('class' => array('tokenize-sample')),
+		);
+
+		$subClassList = getGroupSubclassData(5);
+
+		$form['subsectorclass'] = array(
+			'#type' => 'select',
+			'#title' => t('Bransje: <a href="#" data-toggle="tooltip" title="Du kan velge inntill 10 bransjer &aring; vise data for"><i class="fa fa-question-circle"></i></a>'),
+			'#default_value' => NULL,
+			'#options' => $subClassList,
+			'#id' => 'subctokenize',
+			'#multiple' => TRUE,
+			'#attributes' => array('class' => array('tokenize-sample')),		
+		);
+
+		$fkOptions = getFylkeKommuneList();
+		
+		$form['fkdropdown'] = array(
+			'#type' => 'select',
+			'#title' => t('Fylke / Kommune: <a href="#" data-toggle="tooltip" title="Du kan velge inntill 10 Kommuner/Fylker &aring; vise data for"><i class="fa fa-question-circle"></i></a>'),
+			'#default_value' => NULL,
+			'#multiple' => TRUE,
+			'#options' => $fkOptions ,
+			'#id' => 'fktokenize',	
+			'#attributes' => array('class' => array('tokenize-sample')),	
+		);
+            $suppliersList = getSuppliersList();	
+		$form['suppliername'] = array(
+        	'#type' => 'select',
+        	'#title' => t('Leverand&oslash;rer: <a href="#" data-toggle="tooltip" title="Du kan velge inntill 10 leverand&oslash;rer &aring; vise data for"><i class="fa fa-question-circle"></i></a>'),
+			'#options' => $suppliersList,
+                    '#multiple' => TRUE,
+			'#default_value' => NULL,
+			'#id' => 'supplierid',	
+			'#attributes' => array('class' => array('tokenize-sample')),
+		);
+
+		$form['minravenu'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Minst Kj&oslash;pt: <a href="#" data-toggle="tooltip" title="Velge minste &aring;rlige innkj&oslash;p du &oslash;nsker &aring; vise"><i class="fa fa-question-circle"></i></a>'),
+		);
+
+		$form['maxravenu'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Maks Kj&oslash;pt: <a href="#" data-toggle="tooltip" title="Velge minste &aring;rlige salgsbel&oslash;p du &oslash;nsker &aring; vise"><i class="fa fa-question-circle"></i></a>'),
+		);
+		
+		$form['submit'] = array(
+        	'#type'=>'submit',
+        	'#value'=>t('Søk'),
+      	);
+		
+		$form['reset'] = array(
+			'#type' => 'button',
+			'#button_type' => 'reset',
+			'#value' => t('Nullstill'),
+			'#id' => 'resetbtn',
+			'#attributes' => array(
+			    'onclick' => 'this.form.reset(); return false;',
+			),
+    	);
+
+		if (!empty($form_state['results_table'])) {
+			$form['results_table'] = array('#markup' => $form_state['results_table']);
+			$form['suppids'] = array('#value' => $form_state['suppids'] );
+		}
+				
+		return $form;
+		
+	}
+	
+	//function ajax_group_data_filter_form($form, &$form_state)
+	
+	function group_data_filter_form_submit($form, &$form_state)
+	{
+		
+		$nDataYear = $form_state['values']['datayear'];
+		
+		$strGroupClassID = $form_state['values']['groupclass'];
+		
+		////////////////////////////////////////////////////////////////////
+
+		$arrFKId = $form_state['values']['fkdropdown'];
+		
+		$strFKIDs = array();
+		foreach($arrFKId as $fkId)
+		{
+			if(empty($fkId))
+				continue;
+				
+			$arrFkId = explode('-', $fkId);
+			$strFKIDs[] = $arrFkId[1];
+		}		
+		
+		/////////////////////////////////////////////////////////////////////
+		
+		$strSupplierName = $form_state['values']['suppliername'];
+		
+		$strSubClassIDs = array();
+		if(!empty($strSupplierName))
+		{
+			foreach($strSupplierName as $strSuppID)
+			{
+				if(empty($strSuppID))
+					continue;
+					
+				$strSuppIDs[] = $strSuppID;
+			}	
+		}		
+		/////////////////////////////////////////////////////////////////
+				
+		
+		$arrSubsectorClass = $form_state['values']['subsectorclass'];
+		
+		$strSubClassIDs = array();
+		if(!empty($arrSubsectorClass))
+		{
+			foreach($arrSubsectorClass as $subClassId)
+			{
+				if(empty($subClassId))
+					continue;
+					
+				$strSubClassIDs[] = $subClassId;
+			}		
+		}
+			
+		$nMinRavenu = $form_state['values']['minravenu'];
+		$nMaxRavenu = $form_state['values']['maxravenu'];
+
+		$nMinRavenu = str_replace(" ", "", $nMinRavenu);
+		$nMaxRavenu = str_replace(" ", "", $nMaxRavenu);
+
+		$htmlGroupData = show_group_data($strGroupClassID, $nDataYear, $strFKIDs, $strSuppIDs, $strSubClassIDs, $nMinRavenu, $nMaxRavenu);
+	
+		//$form['results_table']['#markup'] = $htmlGroupData;
+		//return $htmlGroupData;
+
+		$form_state['results_table'] = $htmlGroupData;
+		$form_state['suppids'] = $strSuppIDs;
+
+		$form_state['rebuild'] = TRUE;
+		
+		
+		//return $htmlGroupData;
+		
+	}
+	
+	function groupdata_theme() 
+	{
+		$items = array();
+				
+		$items['group_data_filter_form'] = array(
+			'render element' => 'form',
+			'path' => drupal_get_path('theme', 'leverandors') . '/templates/forms',
+			'template' => 'group_data_form',
+		);
+	
+		return $items;
+	}
+	
+
+	function getgroupDataByGroupId() 
+	{
+		$output = NULL;
+		
+		$groupId = arg(1);
+		$dataYear = arg(2);
+
+		$htmlData = show_group_data($groupId, $dataYear );
+		
+		$output = '<div class="getUrlData">'.$htmlData.'</div>';
+		$output.= drupal_render(drupal_get_form('group_data_filter_form'));
+		
+		return $output;		
+	}	
+	
+		
+	function show_group_data($strGroupClassID, $nDataYear, $strFKIDs=NULL, $strSuppIDs=NULL, $strSubClassIDs=NULL, $nMinRavenu=0 , $nMaxRavenu= 0) 
+	{
+
+		global $base_url;  
+		global $user;
+
+		db_set_active('kommunaldata');	
+
+		// Get Total Branches
+		// GET Yearly FK Invoices 
+		$query = db_select('leverandor_data', 'A');
+		$query->fields('A', array('ld_group', 'ld_subclass'));
+
+		$query->condition('A.ld_group', $strGroupClassID, '=');	
+		$query->condition('A.ld_data_year', array($nDataYear, $nDataYear-1), 'IN');	
+
+		$query->groupBy('A.ld_subclass');
+
+		$arrGroupBranches = $query->execute();
+
+		$totalBranches = $arrGroupBranches->rowCount();
+
+	
+		// GET Yearly FK Invoices 
+		$query = db_select('group_leverandor_total', 'A');
+		$query->fields('A', array('gl_kommune_type', 'gl_data_year', 'gl_group', 'gl_group_name'));
+		$query->addExpression('SUM(gl_total_revenue)', 'totalRevenue');
+		$query->addExpression('SUM(gl_total_company)', 'totalSuppliers');
+
+		$query->condition('A.gl_group', $strGroupClassID, '=');	
+		$query->condition('A.gl_data_year', array($nDataYear, $nDataYear-1), 'IN');	
+
+		$query->groupBy('A.gl_kommune_type');
+		$query->groupBy('A.gl_data_year');
+
+		$query->orderBy('A.gl_kommune_type, A.gl_data_year', 'ASC');
+
+		$arrGroupFKYearlyData = $query->execute()->fetchAll();
+
+		// GET Yearly Companies Invoices 
+		$query = db_select('group_leverandor_total', 'A');
+		$query->fields('A', array('gl_kommune_type', 'gl_data_year', 'gl_group', 'gl_group_name'));
+
+		$query->addExpression('SUM(gl_total_revenue)', 'totalRevenue');
+		$query->addExpression('COUNT(DISTINCT gl_total_company)', 'totalSupplies');
+
+		$query->condition('A.gl_group', $strGroupClassID, '=');	
+		$query->condition('A.gl_data_year', array($nDataYear, $nDataYear-1), 'IN');	
+
+		$query->groupBy('A.gl_data_year');
+
+		$query->orderBy('A.gl_data_year', 'ASC');
+
+		$arrGroupSupYearlyData = $query->execute()->fetchAll();
+
+		db_set_active();
+		
+       	// Getting the total,Fylke and Kommune number of unique suppliers nDataYear
+		db_set_active('kommunaldata');
+		
+		$query = db_select('leverandor_data', 'A');
+		$query->fields('A', array('ld_kommune_type','ld_data_year'));
+		$query->condition('A.ld_group', $strGroupClassID, '=');	
+		$query->condition('A.ld_data_year',  array($nDataYear, $nDataYear-1), 'IN');		
+		$query->addExpression('COUNT(DISTINCT ld_orgnr)', 'totalSuppliers');
+		$query->groupBy('A.ld_kommune_type');
+		$query->groupBy('A.ld_data_year');
+		$arrTotalSupCurrYear = $query->execute()->fetchAll();
+		$totalCurYearSup = 0;
+		db_set_active();
+		$totalFylkeCurYear = 0;
+		$totalKommuneCurYear = 0;
+		
+		foreach($arrTotalSupCurrYear as $rowData)
+		{
+			if($rowData->ld_data_year == $nDataYear){
+				if($rowData->ld_kommune_type == 'kommune'){
+					$totalKommuneCurYear += $rowData->totalSuppliers;
+				}else{
+					$totalFylkeCurYear += $rowData->totalSuppliers;
+				}
+				$totalCurYearSup += $rowData->totalSuppliers;
+			}else{
+				if($rowData->ld_kommune_type == 'kommune'){
+					$totalKommunePrevYear += $rowData->totalSuppliers;
+				}else{
+					$totalFylkePrevYear += $rowData->totalSuppliers;
+				}
+				$totalPrevYearSup += $rowData->totalSuppliers;
+				
+			}
+		}
+			
+		$groupNavn = NULL;	
+		$totalSuppliers = 0;
+		$groupNavn = NULL;
+
+		foreach($arrGroupFKYearlyData as $rowData)
+		{
+			$groupNr = $rowData->gl_group;	
+			$groupNavn = $rowData->gl_group_name;	
+			$totalSuppliers+= $rowData->totalSuppliers;				
+		}
+		
+		$output = NULL;
+							
+		$output.= '<div class="right-content">';
+		$output.= '	<div class="logo-widget">';
+		$output.= '		<h1>'.$groupNavn.'</h1>';
+		$output.= '	</div>';
+
+		$output.= '<h3>Offisiell informasjon</h3>';
+		$output.= '<div class="info-box fylke-result">';
+		$output.= '<a style="float: right; margin-top: -36px; margin-right: -20px;" href="#" data-toggle="tooltip" title="Hovedbransjen er Næringshovedgruppen. Den kan bestå av flere bransjer."><i class="fa fa-question-circle"></i></a>';
+		$output.= '		<div class="inner-box">';
+		
+		$output.= '			<label>';
+		$output.= '				<span style="width:200px;"><strong>Hovedbransje:</strong></span>';
+		$output.= '				<span>'.$groupNr.'</span>';
+		$output.= '			</label>';
+
+		$output.= '			<label>';
+		$output.= '				<span style="width:200px;"><strong>Antall bransjer: </strong></span>';
+		$output.= '				<span>'.$totalBranches.'</span>';
+		$output.= '			</label>';
+
+		$output.= '			<label>';
+		$output.= '				<span style="width:200px;"><strong>Antall leverand&oslash;rer: </strong></span>';
+		$output.= '				<span>'.$totalSuppliers.'</span>';
+		$output.= '			</label>';
+
+		$output.= '		</div>';
+		$output.= '	</div>';
+					
+		$output.= '	<div class="fylke-group-table">';
+		$output.= '	<div class="fylke-table-col">';
+		$output.= '<h4>'.$nDataYear.'</h4>';
+
+		$output.= '<table class="table-view" cellpadding="0" cellspacing="0" width="100%">';
+		$output.= '		<thead>';
+		$output.= '			<tr>';
+		$output.= '				<th width="30%">&nbsp;</th>';
+		$output.= '				<th width="20%" class="rightalign">Kj&oslash;pt <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Kj&oslash;pt i 1000"><i class="fa fa-question-circle"></i></a></th>';
+		$output.= '				<th width="20%" class="rightalign"> Leverand&oslash;rer</th>';
+		$output.= '				<th width="20%" class="rightalign"> Gj. snitt <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Gj. snitt i hele 1000"><i class="fa fa-question-circle"></i></a></th>';
+		$output.= '			</tr>';
+		$output.= '		</thead>';
+		$output.= '	<tbody>';
+
+		$totalCurYearRevenue = $totalCurYearSup = $totalCurYearAvg = 0;
+
+		foreach($arrGroupFKYearlyData as $rowData)
+		{
+			$groupNavn = $rowData->gl_group_name;		
+
+			if($rowData->gl_data_year == $nDataYear)
+			{
+				$output.= '<tr>';
+				if($rowData->gl_kommune_type == 'kommune')
+				{
+					$output.= '<td><strong>Kommune</strong></td>';	
+					$output.= '<td class="rightalign">'.numberFormat($rowData->totalRevenue/1000,0).'</td>';
+					$output.= '<td class="rightalign">'.$totalKommuneCurYear.'</td>';	
+					$output.= '<td class="rightalign">'.numberFormat(($rowData->totalRevenue/$rowData->totalSuppliers)/1000,0).'</td>';	
+				}
+				else
+				{
+					$output.= '<td><strong>Fylke</strong></td>';	
+					$output.= '<td class="rightalign">'.numberFormat($rowData->totalRevenue/1000,0).'</td>';
+					$output.= '<td class="rightalign">'.$totalFylkeCurYear.'</td>';	
+					$output.= '<td class="rightalign">'.numberFormat(($rowData->totalRevenue/$rowData->totalSuppliers)/1000,0).'</td>';							
+				}
+
+				$output.= '</tr>';
+
+				$totalCurYearRevenue+= $rowData->totalRevenue;
+				//$totalCurYearSup+= $rowData->totalSuppliers;
+				$totalCurYearAvg+= $rowData->totalRevenue/$rowData->totalSuppliers;
+			}
+		}
+		// Getting the total number of unique suppliers nDataYear - 1
+		db_set_active('kommunaldata');
+		
+		$query = db_select('leverandor_data', 'A');
+		$query->fields('A', array('ld_data_year', 'ld_subclass_name'));
+		$query->condition('A.ld_group', $strGroupClassID, '=');	
+		$query->condition('A.ld_data_year', array($nDataYear-1,$nDataYear), 'IN');	
+		$query->addExpression('COUNT(DISTINCT ld_orgnr)', 'totalSuppliers');
+		$query->groupBy('A.ld_data_year');
+		$arrTotalSupePrevYear = $query->execute()->fetchAll();
+		$totalLastYearSup = 0;
+		$totalCurYearSup = 0;
+		db_set_active();
+		foreach($arrTotalSupePrevYear as $rowData)
+		{
+			if($rowData->ld_data_year == $nDataYear){
+				$totalCurYearSup += $rowData->totalSuppliers;
+			}else{
+				$totalLastYearSup += $rowData->totalSuppliers;
+			}
+		}
+			
+		$output.= '<tr>';
+		$output.= '<td><strong>Total</strong></th>';	
+		$output.= '<td class="rightalign">'.numberFormat($totalCurYearRevenue/1000,0).'</td>';
+		$output.= '<td class="rightalign">'.$totalCurYearSup.'</td>';	
+		$output.= '<td class="rightalign">'.numberFormat($totalCurYearRevenue/$totalCurYearSup/1000,0).'</td>';	
+		$output.= '</tr>';
+
+		$output.= '	</tbody>';
+		$output.= '	</table>';
+		$output.= '	</div>';
+		
+
+		if($user->uid)
+		{
+			$output.= '	<div class="fylke-table-col">';
+			$output.= '<h4>'.($nDataYear-1).'</h4>';
+
+			$output.= '<table class="table-view" cellpadding="0" cellspacing="0" width="98%">';
+			$output.= '		<thead>';
+			$output.= '			<tr>';
+			$output.= '				<th width="30%">&nbsp;</th>';
+			$output.= '				<th width="20%" class="rightalign">Kj&oslash;pt <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Kj&oslash;pt in 1000"><i class="fa fa-question-circle"></i></a></th>';
+			$output.= '				<th width="20%" class="rightalign"> Leverand&oslash;rer</th>';
+			$output.= '				<th width="20%" class="rightalign"> Gj. snitt <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Gj. snitt i hele 1000"><i class="fa fa-question-circle"></i></a></th>';
+			$output.= '			</tr>';
+			$output.= '		</thead>';
+			$output.= '	<tbody>';
+
+
+			$totalLastYearRevenue = /*$totalLastYearSup = */$totalLastYearAvg = 0;
+
+			foreach($arrGroupFKYearlyData as $rowData)
+			{
+				$groupNavn = $rowData->gl_group_name;		
+
+				if($rowData->gl_data_year == $nDataYear-1)
+				{
+					$output.= '<tr>';
+					if($rowData->gl_kommune_type == 'kommune')
+					{
+						
+						$output.= '<td><strong>Kommune</strong></th>';	
+						$output.= '<td class="rightalign">'.numberFormat($rowData->totalRevenue/1000,0).'</td>';
+						$output.= '<td class="rightalign">'.$totalKommunePrevYear.'</td>';	
+						$output.= '<td class="rightalign">'.numberFormat(($rowData->totalRevenue/$rowData->totalSuppliers)/1000,0).'</td>';	
+					}
+					else
+					{
+						$output.= '<td><strong>Fylke</strong></th>';	
+						$output.= '<td class="rightalign">'.numberFormat($rowData->totalRevenue/1000,0).'</td>';
+						$output.= '<td class="rightalign">'.$totalFylkePrevYear.'</td>';	
+						$output.= '<td class="rightalign">'.numberFormat(($rowData->totalRevenue/$rowData->totalSuppliers)/1000,0).'</td>';	
+					}
+
+					$output.= '</tr>';
+
+					$totalLastYearRevenue+= $rowData->totalRevenue;
+					//$totalLastYearSup+= $rowData->totalSuppliers;
+					$totalLastYearAvg+= $rowData->totalRevenue/$rowData->totalSuppliers;
+
+				}
+			}
+
+			
+			$output.= '<tr>';
+			$output.= '<td><strong>Total</strong></th>';	
+			$output.= '<td class="rightalign">'.numberFormat($totalLastYearRevenue/1000,0).'</td>';
+			$output.= '<td class="rightalign">'.$totalLastYearSup.'</td>';	
+			$output.= '<td class="rightalign">'.numberFormat($totalLastYearRevenue/$totalLastYearSup/1000,0).'</td>';	
+			$output.= '</tr>';
+
+			$output.= '	</tbody>';
+			$output.= '	</table>';
+			$output.= '	</div>';
+			$output.= '	</div>';
+			$output.= '<h4>&nbsp;</h4>';
+			$output.= '<div class="info-box">';
+			$output.= '<div class="inner-box">';
+			$output.= 'Tabellen over viser det året du har valgt og det foregående året. For visning av andre år må du endre dette i menyen til venstre. ';
+			$output.= '<br/>Datatilfanget er mindre for tidligere år enn inneværende år. Du kan derfor ikke nødvendigvis sammenligne år mot år.';
+			$output.= '	</div>';
+			$output.= '	</div>';
+			
+			db_set_active('kommunaldata');
+			
+			// GET Group  Data 
+			$query = db_select('subclass_leverandor_total', 'A');
+			$query->fields('A', array('sc_subclass_name', 'sc_total_company', 'sc_total_revenue'));
+			$query->condition('A.sc_group', $strGroupClassID, '=');	
+			$query->condition('A.sc_data_year', $nDataYear, '=');	
+			
+			$query->orderBy('A.sc_total_revenue', 'DESC');
+
+			$query->range(0, 10);
+			
+			$arrSubClassData = $query->execute()->fetchAll();
+			
+			db_set_active();
+
+			$output.= '<h4>Bransjer</h4>';
+			$output.= '<i>Tabellen under viser alle bransjene som hører under hovedbransjen <strong>'.$groupNavn.'.</strong></i>';
+			$output.= '<table class="table-view" cellpadding="0" cellspacing="0" width="100%">';
+			$output.= '		<thead>';
+			$output.= '			<tr>';
+			$output.= '				<th width="30%">Bransje Navn</th>';
+			$output.= '				<th width="20%" class="rightalign">Kj&oslash;pt <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Innkjøp fra Kommuner/Fylker fordelt på bransjer i 1000"><i class="fa fa-question-circle"></i></a></th>';
+			$output.= '				<th width="20%" class="rightalign">Leverand&oslash;rer <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Antall leverandører"><i class="fa fa-question-circle"></i></a></th>';
+			$output.= '				<th width="20%" class="rightalign"> Gj. snitt <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Gj. snitt i hele 1000"><i class="fa fa-question-circle"></i></a></th>';
+			$output.= '			</tr>';
+			$output.= '		</thead>';
+			$output.= '	<tbody>';
+
+			$num = 1;
+			foreach($arrSubClassData as $rowData)
+			{
+
+				$output.= '<tr>';
+				$output.= '<td>'.$num.'-'.$rowData->sc_subclass_name.'</th>';	
+				$output.= '<td class="rightalign">'.numberFormat($rowData->sc_total_revenue/1000,0).'</td>';
+				$output.= '<td class="rightalign">'.$rowData->sc_total_company.'</td>';	
+				$output.= '<td class="rightalign">'.numberFormat(($rowData->sc_total_revenue/$rowData->sc_total_company)/1000,0).'</td>';
+				$output.= '</tr>';
+
+				$num++;
+			}
+
+			$output.= '	</tbody>';
+			$output.= '	</table>';
+
+			$output.=  getFylkeKommuneDataByGroupId($nDataYear, $strGroupClassID, 'kommune', 'Kommuner', $strFKIDs, $nMinRavenu, $nMaxRavenu);
+
+			$output.=  getFylkeKommuneDataByGroupId($nDataYear, $strGroupClassID, 'fylkeskommune', 'Fylker', $strFKIDs, $nMinRavenu, $nMaxRavenu);
+
+			db_set_active('kommunaldata');
+			
+			// GET Supplier  Data 
+			$query = db_select('leverandor_data', 'A');
+			$query->fields('A', array('ld_orgnr', 'ld_orgnavn', 'ld_data_year'));
+			$query->addExpression('SUM(ld_revenue)', 'totalRevenue');
+			$query->addExpression('COUNT(ld_kommune_id)', 'totalFK');
+
+			$query->condition('A.ld_group', $strGroupClassID, '=');	
+			$query->condition('A.ld_data_year', $nDataYear, '=');	
+
+			if(!empty($strSubClassIDs))
+				$query->condition('A.ld_subclass', ($strSubClassIDs), 'IN');
+			
+			if(!empty($strFKIDs))
+				$query->condition('A.ld_kommune_id', ($strFKIDs), 'IN');
+			
+			if(!empty($strSuppIDs))
+				$query->condition('A.ld_orgnr', ($strSuppIDs), 'IN');	
+
+			if($nMinRavenu > 0)
+				$query->condition('A.ld_revenue', $nMinRavenu, '>=');	
+
+			if($nMaxRavenu > 0)
+				$query->condition('A.ld_revenue', $nMaxRavenu, '<=');					
+
+			$query->groupBy('A.ld_orgnr');
+
+			$query->orderBy('totalRevenue', 'DESC');
+
+			$query->range(0, 10);
+
+			$arrSuppliersData = $query->execute()->fetchAll();
+			
+			db_set_active();
+
+			$output.= '<h4>Leverand&oslash;r</h4>';
+			$output.= '<i>Tabellen under viser de 10 største leverandørene som er registert i hovedbransjen <strong>'.$groupNavn.'.</strong></i>';
+
+			$output.= '<table class="table-view" cellpadding="0" cellspacing="0" width="100%">';
+			$output.= '		<thead>';
+			$output.= '			<tr>';
+			$output.= '				<th width="30%">Leverand&oslash;r Navn</th>';
+			$output.= '				<th width="20%" class="rightalign">Kj&oslash;pt <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Kj&oslash;pt i 1000"><i class="fa fa-question-circle"></i></a></th>';
+			$output.= '				<th width="20%" class="rightalign"> Kommuner/Fylker <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Antall Kommuner/Fylker leverandøren har levert til"><i class="fa fa-question-circle"></i></a></th>';
+			$output.= '				<th width="20%" class="rightalign"> Gj. snitt <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Gj. snittlig leveranse til hver Kommune/Fylke i 1000"><i class="fa fa-question-circle"></i></a></th>';
+			$output.= '			</tr>';
+			$output.= '		</thead>';
+			$output.= '	<tbody>';
+
+			$num = 1;
+			foreach($arrSuppliersData as $rowData)
+			{
+				$bgcolor = ($num % 2 === 0) ? 'class="rowBackground"' : NULL;
+													
+				$output.= '<tr '.$bgcolor.' >';
+		
+				$output.= '<td>'.$num.'-<a href="'.$base_url.'/levrandordata/'.$rowData->ld_orgnr.'/'.$nDataYear.'" target="_blank">'.$rowData->ld_orgnavn.'</a></th>';	
+				$output.= '<td class="rightalign">'.numberFormat($rowData->totalRevenue/1000,0).'</td>';
+				$output.= '<td class="rightalign">'.$rowData->totalFK.'</td>';	
+				$output.= '<td class="rightalign">'.numberFormat(($rowData->totalRevenue/$rowData->totalFK)/1000,0).'</td>';
+				$output.= '</tr>';
+
+				$num++;
+			}
+
+			$output.= '	</tbody>';
+			$output.= '	</table>';	
+		}
+		else
+		{
+			$module_path = drupal_get_path('module', 'groupdata');
+			
+			$output.= '</div><div class="sammendrag-panel" id="getuserlogin">';
+			$output.= '<div id="user-login-view">';
+			$output.= '<div class="sam-login-widget">';
+			
+			$output.= '<div class="login-form-widget">';
+			$output.= '<div class="left-form">';
+			$output.= '<h4 class="modal-title">JEG ER ABONNENT</h4>';
+			$output.= render(drupal_get_form('user_login_block'));
+			$output.= '</div>';
+			$output.= '<div class="right-form">';
+			$output.= '<h4>JEG ER IKKE ABONNENT</h4>';
+			$output.= '<a href="/abonner" class="form-submit">Kontakt oss for tilbud</a>';
+			$output.= '</div>';
+			$output.= '<p>Spørsmål? Kontakt oss på tlf 24 13 64 50 eller leverandor@kommunal-rapport.no</p>';
+			$output.= '</div>';
+						
+			$output.= '</div>';
+			$output.= '</div>';
+			$output.= '<img src="'.$base_url.'/'.$module_path.'/img/datapreview.jpg" title="preview" />';	
+			$output.= '</div>'; 
+
+
+		}	
+		
+		$output.= '	</div>';	
+
+		return $output;
+
+	}
+
+	function getFylkeKommuneDataByGroupId($dataYear, $groupId, $Type, $titleType, $kommuneIds = NULL, $nMinRavenu = 0, $nMaxRavenu= 0)
+	{
+
+		global $base_url;
+		$output = NULL;
+
+		db_set_active('kommunaldata');
+		
+		// GET Group  Data 
+		/* SQL
+			select gl_kommune_id,gl_kommune_navn,gl_kommune_type,gl_kommune_ingroup,gl_group, gl_data_year, gl_group_name, gl_total_company, gl_total_revenue
+			from tbl_group_leverandor_total
+			where gl_group = '62.0' and gl_data_year = 2013 and gl_kommune_type = 'kommune'	
+			order by gl_total_revenue desc
+			limit 10
+		*/
+		$query = db_select('group_leverandor_total', 'A');
+		$query->fields('A', array('gl_kommune_id','gl_kommune_navn', 'gl_kommune_type','gl_kommune_ingroup','gl_group', 'gl_data_year', 'gl_group_name', 'gl_total_company', 'gl_total_revenue'));
+		$query->condition('A.gl_group', $groupId, '=');	
+		$query->condition('A.gl_data_year', $dataYear, '=');	
+		$query->condition('A.gl_kommune_type', $Type, '=');	
+		
+		if(!empty($kommuneIds))
+			$query->condition('A.gl_kommune_id', ($kommuneIds), 'IN');	
+
+		if($nMinRavenu > 0)
+			$query->condition('A.gl_total_revenue', $nMinRavenu, '>=');	
+
+		if($nMaxRavenu > 0)
+			$query->condition('A.gl_total_revenue', $nMaxRavenu, '<=');	
+			
+		$query->orderBy('A.gl_total_revenue', 'DESC');
+
+		$query->range(0, 10);
+				
+		$arrFylkeKommuneData = $query->execute()->fetchAll();
+		
+		db_set_active();
+
+		foreach($arrFylkeKommuneData as $rowData)
+		{
+			$groupNavn = $rowData->gl_group_name;
+		}		
+
+		$output.= '<h4>'.$titleType.'</h4>';
+		
+		$output.= '<i>Tabellen under viser de 10 '.strtolower($titleType).' (innenfor s&oslash;kekriteriene) som har handlet mest fra selskaper som er registert i hovedbransjen <strong>'.$groupNavn.'.</strong></i>';
+		$output.= '<table class="table-view" cellpadding="0" cellspacing="0" width="100%">';
+		$output.= '		<thead>';
+		$output.= '			<tr>';
+		$output.= '				<th width="30%">'.$titleType.'</th>';
+		$output.= '				<th width="20%" class="rightalign">Kj&oslash;pt <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Innkjøp i bransjen i 1000"><i class="fa fa-question-circle"></i></a></th>';
+
+		$output.= '				<th width="20%" class="rightalign"> Leverand&oslash;rer <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Antall leverandører"><i class="fa fa-question-circle"></i></a></th>';
+		
+		if($Type == 'kommune')
+			$output.= '<th width="20%" class="rightalign"> Gj. snitt <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Gj. snittlig innkjøp i kommuner av samme størrelse for denne bransjen i hele 1000"><i class="fa fa-question-circle"></i></a></th>';
+		else
+			$output.= '<th width="20%" class="rightalign"> Gj. snitt <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Gj. snittlig innkjøp i fylker for denne bransjen i hele 1000"><i class="fa fa-question-circle"></i></a></th>';
+		
+		$output.= '			</tr>';
+		$output.= '		</thead>';
+		$output.= '	<tbody>';
+
+
+		$num = 1;
+		foreach($arrFylkeKommuneData as $rowData)
+		{
+						
+			////////////////////////////////////////////////////////////////
+			/* SQL 
+			
+			select ig_total_revenue, ig_total_company,ig_total_revenue/ ig_total_company
+			from group_data_by_fk_ingroup
+			where ig_group = '62.0' and ig_kommune_ingroup = 6 and ig_data_year = 2013
+			
+			*/
+			db_set_active('kommunaldata');	
+
+			$query = db_select('group_data_by_fk_ingroup', 'A');
+			$query->fields('A', array('ig_total_revenue', 'ig_total_company'));
+			
+			$query->condition('A.ig_group', $rowData->gl_group);
+			$query->condition('A.ig_kommune_ingroup', $rowData->gl_kommune_ingroup);
+			$query->condition('A.ig_data_year', $dataYear);	
+	
+			$arrGroupInGroupData = $query->execute()->fetchAll();
+
+			db_set_active();
+
+			$groupAverage = 0;
+
+			foreach ($arrGroupInGroupData as $ingroup) {
+				$groupAverage = $ingroup->ig_total_revenue/$ingroup->ig_total_company;
+			}
+
+			////////////////////////////////////////////////////////////////
+
+			$output.= '<tr>';
+
+			if($rowData->gl_kommune_type == 'kommune')
+				$output.= '	<td>'.$num.'-<a href="'.$base_url.'/kommundata/'.$rowData->gl_kommune_id.'/'.$dataYear.'" target="_blank">'.$rowData->gl_kommune_navn.'</a></td>';	
+			else
+				$output.= '	<td>'.$num.'-<a href="'.$base_url.'/fylkedata/'.$rowData->gl_kommune_id.'/'.$dataYear.'" target="_blank">'.$rowData->gl_kommune_navn.'</a></td>';	
+
+			$output.= '<td class="rightalign">'.numberFormat($rowData->gl_total_revenue/1000,0).'</td>';
+			
+			$output.= '<td class="rightalign">'.$rowData->gl_total_company.'</td>';	
+
+			$output.= '<td class="rightalign">'.numberFormat($groupAverage/1000,0).'</td>';
+			
+			$output.= '</tr>';
+			$num++;
+		}
+
+		$output.= '	</tbody>';
+		$output.= '	</table>';
+
+		db_set_active();
+
+		return $output;
+
+	}
+	

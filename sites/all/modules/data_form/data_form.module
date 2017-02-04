@@ -1,0 +1,702 @@
+<?php
+	
+	function data_form_menu() 
+	{
+		$items = array();
+
+		$items['abonner'] = array(
+			'type' => MENU_CALLBACK,
+			'title' => t('Kontakt oss'),
+			'page callback' => 'drupal_get_form',
+			'access arguments' => array('access content'),
+			'page arguments' => array('show_abonner_data_form', '1')
+		);
+
+		$items['ebook'] = array(
+			'type' => MENU_CALLBACK,
+			'title' => t('E Book'),
+			'page callback' => 'drupal_get_form',
+			'access arguments' => array('access content'),
+			'page arguments' => array('show_ebook_data_form', '2')
+		);
+		
+		$items['admin/config/content/registrationdata'] = array(
+			'type' => MENU_NORMAL_ITEM,
+			'title' => t('Registration Data'),
+			'page callback' => 'show_register_data',
+    		'access arguments' => array('administer site configuration'),
+		);
+
+		$items['admin/config/content/registrationdataview/%'] = array(
+			'type' => MENU_NORMAL_ITEM,
+			'title' => t('View Registration Data'),
+			'page callback' => 'show_register_view_data',
+    		'access arguments' => array('access content'),
+		);
+
+		$items['admin/config/content/registrationdatadelete/%'] = array(
+			'type' => MENU_NORMAL_ITEM,
+			'title' => t('Delete Registration Data'),
+			'page callback' => 'show_register_delete_data',
+    		'access arguments' => array('access content'),
+		);
+
+		$items['admin/config/content/registrationdataedit/%'] = array(
+			'type' => MENU_NORMAL_ITEM,
+			'title' => t('Edit Registration Data'),
+			'page callback' => 'show_register_edit_data',
+    		'access arguments' => array('access content'),
+		);
+		
+		return $items;	
+
+	}
+
+	function data_form_permission() 
+	{
+	  	return array(
+	    	'regd content' => array(
+	      		'title' => t('Registration Data'),
+	      		'description' => 'Show Registration Data',
+	    	),
+	  	);
+	}
+
+	function show_abonner_data_form($form, &$form_state) 
+	{
+			
+		$form['#redirect'] = false;
+		
+		$form['usertype'] = array(
+			'#type' => 'radios',
+			'#title' => 'Jeg &oslash;nsker:',
+			
+/*			'#options' => array('firma'=>t('&Aring; f&aring; et tilbud p&aring; tilgang'), 'kommune-fylke'=>t('Rapportere om feil'), 'privatperson'=>t('&Aring; f&aring; generell info')),
+			'#default_value' => 'firma'*/
+			
+			'#options' => array('abonner'=>t('&Aring; f&aring; et tilbud p&aring; tilgang'), 'feilrapport'=>t('Rapportere om feil'), 'info'=>t('&Aring; f&aring; generell info')),
+			'#default_value' => 'abonner'
+		);
+
+		$form['vnaven'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Navn:'),
+			'#default_value' => $_GET['fullName'],
+			'#attributes' => array('placeholder' => 'Navn:'),			
+		);
+
+		$form['tittel'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Firma:'),
+			'#attributes' => array('placeholder' => 'Firma:'),
+		);
+
+		$form['telefonnummer'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Telefon:'),
+			'#default_value' => $_GET['telefonnummer'],
+			'#attributes' => array('placeholder' => 'Telefon:'),
+		);
+
+		$form['epost'] = array(
+			'#type' => 'textfield',
+			'#title' => t('E-postadresse'),
+			'#default_value' => $_GET['epost'],
+			'#attributes' => array('placeholder' => 'E-postadresse:'),
+		);
+		
+		$form['chtype'] = array(
+			'#type' => 'radios',
+			'#title' => t('Nyhetsbrev'),
+			'#description' => t('Du f&aring;r en max en e-post i m&aring;neden'),
+			'#options' => array('Nei', 'Ja')
+		);
+
+		$form['meldingsfelt'] = array(
+			'#type' => 'textarea',
+			'#title' => t('Meldingsfelt'),
+			'#attributes' => array('placeholder' => 'Meldingsfelt'),
+			'#wysiwyg' => false,
+		);
+		 
+		$form['submit'] = array(
+        	'#type'=>'submit',
+        	'#value'=> t('Send'),
+      	); 
+		
+		if (!empty($form_state['abonnersuccess'])) {
+			$form['asuccess'] = array('#markup' => $form_state['abonnersuccess']);
+		}
+		
+		return $form;
+	}
+	
+	function show_abonner_data_form_submit($form, &$form_state)
+	{
+		
+		if($form_state['values']['usertype'] == 'abonner')
+			$frmMessage = 'Jeg &oslash;nsker &aring; abbonere p&aring; tjenesten';			
+		else
+			$frmMessage = $form_state['values']['meldingsfelt'];		
+					
+		$frmId = db_insert('abonner')->fields(array(
+		  										'frm_usertype' => $form_state['values']['usertype'],
+												'frm_vnaven' => $form_state['values']['vnaven'],
+												'frm_kontaktperson' => $form_state['values']['kontaktperson'],
+												'frm_tittel' => $form_state['values']['tittel'],
+												'frm_telefonnummer' => $form_state['values']['telefonnummer'],
+												'frm_epost' => $form_state['values']['epost'],
+												'frm_meldingsfelt' => $frmMessage,
+												'frm_new_letter' => $form_state['values']['chtype'],
+												'frm_type' => $form_state['values']['usertype'],
+											))->execute();
+			
+		if($frmId)
+		{			
+			$message = 'Det er kommet en henvendelse fra Kontakt oss.<br/><br/>';
+		    $message.= "Jeg &oslash;nsker: ".$form_state['values']['usertype']."<br/>";
+		    $message.= "Navn: ".$form_state['values']['vnaven']."<br/>";
+		    $message.= "Firma: ".$form_state['values']['tittel']."<br/>";
+		    $message.= "Telefon: ".$form_state['values']['telefonnummer']."<br/>";
+		    $message.= "E-post: ".$form_state['values']['epost']."<br/>";
+			
+			if($form_state['values']['chtype'] == 0){
+				$message.= "Nyhetsbrev: Ja<br/><br/>";
+			}else{
+				$message.= "Nyhetsbrev: Nei<br/><br/>";
+			}
+		    
+			$message.= "Meldingsfelt: ".$form_state['values']['meldingsfelt']."<br/><br/>";
+			$message.= "<a href='http://www.xn--leverandrdatabasen-n4b.no/abonner#overlay=admin/config/content/registrationdata'>Link til data (krever innlogging som admin)</a><br/>";
+		    
+			$to = 'leverandor@kommunal-rapport.no';
+			$subject = "Leverandørdatabasen Kontakt oss";
+					
+			$headers = "MIME-Version: 1.0" . "\r\n";
+			$headers .= "Content-type:text/html;charset=UTF-8"."\r\n";
+			$headers .= "From: ".$form_state['values']['epost'].">"."\r\n";
+			
+			mail($to, $subject, $message, $headers);
+			
+		
+		}						
+
+		$form_state['abonnersuccess'] = 'success';
+		
+		$form_state['rebuild'] = TRUE;
+
+	}
+	
+	function data_form_theme() 
+	{
+		
+		$items = array();
+				
+		$items['show_abonner_data_form'] = array(
+			'render element' => 'form',
+			'path' => drupal_get_path('theme', 'leverandors') . '/templates/forms',
+			'template' => 'data_form_abonner',
+		);
+
+		$items['show_ebook_data_form'] = array(
+			'render element' => 'form',
+			'path' => drupal_get_path('theme', 'leverandors') . '/templates/forms',
+			'template' => 'data_form_ebook',
+		);
+	
+		return $items;
+		
+	}
+
+	function show_ebook_data_form($form, &$form_state) 
+	{
+			
+		$form['#redirect'] = false;
+		
+		$form['vnaven'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Navn:'),
+			'#attributes' => array('placeholder' => 'Navn:'),			
+		);
+
+		$form['tittel'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Firma:'),
+			'#attributes' => array('placeholder' => 'Firma:'),
+		);
+
+		$form['epost'] = array(
+			'#type' => 'textfield',
+			'#title' => t('E-postadresse'),
+			'#attributes' => array('placeholder' => 'E-postadresse'),
+		);
+		
+		$form['chtype'] = array(
+			'#type' => 'radios',
+			'#title' => t('Nyhetsbrev'),
+			'#description' => t('Du f&aring;r max en e-post i m&aring;neden'),
+			'#options' => array('Nei', 'Ja')
+		);
+		
+		$form['sendfriend'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Send denne linken til en venn'),
+			'#attributes' => array('placeholder' => 'Send denne linken til en venn'),
+		);
+		
+		if (!empty($form_state['booklink'])) {
+			$form['book'] = array('#markup' => $form_state['booklink']);
+		}else{
+			$form['submit'] = array(
+				'#type'=>'submit',
+				'#value'=> t('Download'),
+			);
+		}
+		
+		
+		return $form;
+	}
+	
+	function show_ebook_data_form_submit($form, &$form_state)
+	{
+
+		db_set_active();
+		
+		$vnaven = $form_state['values']['vnaven'];
+		$tittel = $form_state['values']['tittel'];
+		$arbeidsgiver = $form_state['values']['arbeidsgiver'];
+		$epost = $form_state['values']['epost'];
+		$chtype = $form_state['values']['chtype'];
+		$sendfriend = $form_state['values']['sendfriend'];		
+		
+		$value = db_query("INSERT INTO drp_abonner (frm_vnaven, frm_tittel, frm_epost, frm_new_letter, frm_type) VALUES ('".$vnaven."', '".$tittel."', '".$epost."', '".$chtype."', 'E-bok' ); ");
+				
+		$nids = db_select('node', 'n')
+					->fields('n', array('nid'))
+					->fields('n', array('type'))
+					->condition('n.type', 'e_books')
+					->orderBy('n.nid', 'DESC')
+					->range(0, 1)
+					->execute() 
+					->fetchCol(); // returns an indexed array
+					
+		$node = node_load($nids[0]);
+		
+		$fileName = $node->title;
+
+		$filePath = file_create_url($node->field_upload_book['und'][0]['uri']);
+		
+		$message = NULL;
+		$message.= 'Her er link til nedlasting av E-boken: <a href="'.$filePath.'" target="_blank">Last ned her</a>';
+		$message.= '<br/><br/>Med vennlig hilsen<br/>Kommunal Rapport<br/><br/>';
+
+		$message.= 'Nyheter fra Kommunal Rapport<br/>';
+		$message.= 'kommunal-rapport.no<br/><br/>';
+
+		$message.= 'Leverandørdatabasen<br/>';
+		$message.= 'leverandørdatabasen.no<br/><br/>';
+		
+		$message.= 'Kommunebarometeret<br/>';
+		$message.= 'kommunebarometeret.no<br/>';
+		
+		$messagetofriend = NULL;
+		$messagetofriend.= 'Hei!<br/><br/>Din venn '.$vnaven.' foreslår at du laster ned denne gratis e-boken om leverandørene i kommunal sektor.<br/><br/>';
+		$messagetofriend.= 'E-boken gir deg et raskt overblikk over det kommunale markedet. Hvem de største aktørene og bransjene er, og hvor mye penger de henter ut fra norske kommuner og fylker hvert år.<br/><br/>';
+		$messagetofriend.= 'Her er link til nedlasting av E-boken: <a href="http://www.xn--leverandrdatabasen-n4b.no/ebook" target="_blank">Last ned her</a>';
+		$messagetofriend.= '<br/><br/>Med vennlig hilsen<br/>Kommunal Rapport<br/><br/>';
+
+		$messagetofriend.= 'Nyheter fra Kommunal Rapport<br/>';
+		$messagetofriend.= 'kommunal-rapport.no<br/><br/>';
+
+		$messagetofriend.= 'Leverandørdatabasen<br/>';
+		$messagetofriend.= 'leverandørdatabasen.no<br/><br/>';
+		
+		$messagetofriend.= 'Kommunebarometeret<br/>';
+		$messagetofriend.= 'kommunebarometeret.no<br/>';
+		
+		$to = $form_state['values']['epost'];
+		$subject = "Leverandørdatabasen E-bok";
+				
+		$headers = "MIME-Version: 1.0" . "\r\n";
+		$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
+		
+		$headers .= 'From: <leverandor@kommunal-rapport.no>' . "\r\n";
+		
+		mail($to, $subject, $message, $headers);
+		
+		mail($sendfriend, $subject, $messagetofriend, $headers);
+		
+		$notificationmessage = NULL;
+		$notificationmessage.= 'En ny bruker har lastet ned eboken:<br/><br/>';
+		$notificationmessage.= 'Navn: '.$vnaven.'<br/>';
+		$notificationmessage.= 'Firma: '.$tittel.'<br/>';
+		$notificationmessage.= 'Epost: '.$epost.'<br/>';
+		$notificationmessage.= 'Nyhetsbrev: '.$chtype.'<br/>';
+		$notificationmessage.= 'Send til venn: '.$sendfriend.'<br/>';
+		
+		mail('leverandor@kommunal-rapport.no','Ny ebok nedlasting',$notificationmessage,$headers);
+				
+		$form_state['booklink'] = $filePath;
+			
+		$form_state['rebuild'] = TRUE;
+		
+	}
+
+
+	function show_register_data()
+	{
+
+		global $base_url;
+
+		$output = NULL;
+
+		$query = db_select('abonner', 'A');
+		
+		$query->fields('A', array('frm_id', 'frm_usertype', 'frm_vnaven', 'frm_kontaktperson', 'frm_tittel', 'frm_telefonnummer', 'frm_epost','frm_arbeidsgiver', 'frm_new_letter', 'frm_type', 'frm_date', 'frm_expire_date'));
+
+		$query->orderBy('A.frm_id', 'DESC');
+
+		$arrRegData = $query->execute();
+
+		$output.= '<table>';
+		$output.= '	<thead>';
+		$output.= '		<tr>';
+		$output.= '			<th>Jeg ønsker</th>';
+		$output.= '			<th>Fullt Navn</th>';
+		$output.= '			<th>Firma </th>';
+		$output.= '			<th>Telefon </th>';
+		$output.= '			<th>E-post </th>';
+		$output.= '			<th>Arbeidsgiver </th>';
+		$output.= '			<th>Nyhetsbrev </th>';
+		$output.= '			<th>Type </th>';
+		$output.= '			<th>Action </th>';
+		$output.= '		</tr>';		
+		$output.= '</thead>';
+
+		$output.= '<tbody>';
+
+		foreach ($arrRegData as $rowData) {
+			
+			if($rowData->frm_new_letter == 1)
+				$newsLetter = 'Yes';
+			else
+				$newsLetter = 'No';
+			
+			$output.= '<tr>';
+			$output.= ' <td>'.$rowData->frm_usertype.'</td>';
+			$output.= ' <td>'.$rowData->frm_vnaven.'</td>';
+			$output.= ' <td>'.$rowData->frm_tittel.'</td>';
+			$output.= ' <td>'.$rowData->frm_telefonnummer.'</td>';
+			$output.= '	<td>'.$rowData->frm_epost.'</td>';
+			$output.= '	<td>'.$rowData->frm_arbeidsgiver.'</td>';	
+			$output.= '	<td>'.$newsLetter.'</td>';	
+			$output.= '	<td>'.$rowData->frm_type.'</td>';				
+			$output.= '	<td> 
+							<a href="'.$base_url.'/admin/config/content/registrationdataview/'.$rowData->frm_id.'">View</a> | 
+							<a href="'.$base_url.'/admin/config/content/registrationdataedit/'.$rowData->frm_id.'">Edit</a> | 
+							<a href="'.$base_url.'/admin/config/content/registrationdatadelete/'.$rowData->frm_id.'">Delete</a> </td>';
+			$output.= '</tr>';
+		}
+
+		$output.= '</tbody>';
+		$output.= '</table>';
+		
+		return $output;	
+	}
+
+	function show_register_view_data()
+	{
+		global $base_url;
+
+		$output = NULL;
+
+		$query = db_select('abonner', 'A');
+		
+		$query->fields('A', array('frm_id', 'frm_usertype', 'frm_vnaven', 'frm_kontaktperson', 'frm_telefonnummer', 'frm_tittel', 'frm_epost', 'frm_meldingsfelt', 'frm_type','frm_date', 'frm_expire_date'));
+
+		$query->condition('A.frm_id', arg(4));
+
+		$query->orderBy('A.frm_id', 'DESC');
+
+		$arrRegData = $query->execute();
+
+		$output.= '<style type="text/css">
+			.post-content, 
+			.post-form{
+				padding: 20px;
+				border: 1px solid #CCC;
+				margin-bottom: 30px;
+			}
+
+			.post-content ul{
+				margin: 0px;
+				padding: 0px;
+				list-style: none;
+			}
+
+			.post-content ul li{
+				margin-bottom: 20px;
+			}
+
+			.post-content ul li:last-child{
+				margin-bottom: 0px;
+			}
+
+			.post-content strong{
+				display: inline-block;
+			}
+
+			.post-content p{
+				display: inline-block;
+				margin: 0px;
+			}
+
+			.post-form label{
+				font-weight: normal;
+				margin-bottom: 10px;
+			}
+
+			.post-form label span{
+				display: inline-block;
+				vertical-align: bottom;
+			}
+
+			.post-form label input{
+				display: inline-block;
+				border-bottom: 1px solid #CCC;
+				padding: 10px;
+				width: 500px;
+				vertical-align: bottom;
+			}
+
+			.post-form input[type="submit"]{
+				padding: 10px 20px;
+				border: 0px;
+				margin-top: 30px;
+				cursor: pointer;
+			}
+		</style>';
+
+		
+		foreach ($arrRegData as $rowData) {
+			
+			$output.= '<div class="post-content">';
+			$output.= '<ul>';
+			$output.= '<li>';
+			$output.= '<strong>Henvendelsestype: </strong> <p>'.$rowData->frm_type.'</p>';
+			$output.= '</li>';
+			$output.= '<li>';
+			if($rowData->frm_type == 'abonner'){
+				$output.= '<strong>Registreringsdato: </strong> <p>'.$rowData->frm_date.'</p>';
+				$output.= '</li>';
+				$output.= '<li>';
+				$output.= '<strong>Neste faktura dato: </strong> <p>'.$rowData->frm_expire_date.'</p>';
+				$output.= '</li>';
+				$output.= '<li>';
+				$output.= '<strong>N/A: </strong> <p>'.$rowData->frm_usertype.'</p>';
+				$output.= '</li>';
+			}
+			$output.= '<li>';
+			$output.= '			<strong>Navn:</strong> ';
+			$output.= '			<p>'.$rowData->frm_vnaven.'</p>';
+			$output.= '</li>';
+			$output.= '<li>';
+			$output.= '			<strong>Kontaktperson: </strong>';
+			$output.= '			<p>'.$rowData->frm_kontaktperson.'</p>';	
+			$output.= '</li>';
+			$output.= '<li>';
+			$output.= '			<strong>Firma: </strong>';
+			$output.= '			<p>'.$rowData->frm_tittel.'</p>';	
+			$output.= '</li>';
+			$output.= '<li>';
+			$output.= '			<strong>Telefonnummer: </strong>';
+			$output.= '			<p>'.$rowData->frm_telefonnummer.'</p>';	
+			$output.= '</li>';
+			$output.= '<li>';
+			$output.= '			<strong>E-post: </strong>';
+			$output.= '			<p>'.$rowData->frm_epost.'</p>';	
+			$output.= '</li>';
+			$output.= '<li>';
+			$output.= '			<strong>Meldingsfelt: </strong>';
+			$output.= '			<p>'.$rowData->frm_meldingsfelt.'</p>';	
+			$output.= '</li>';
+			$output.= '</div>';
+
+			$frmId = $rowData->frm_id;
+		}
+
+		$output.= '<a href="'.$base_url.'/admin/config/content/registrationdatadelete/'.$frmId.'">Delete</a>';
+				
+		return $output;	
+
+	}
+
+	function show_register_delete_data()
+	{
+		$num_deleted = db_delete('abonner')->condition('frm_id', arg(4))->execute();
+
+		drupal_goto('/admin/config/content/registrationdata');
+	}
+
+	function show_register_edit_data()
+	{
+
+		global $base_url;
+
+
+		drupal_add_library('system', 'ui.datepicker');
+  		drupal_add_js("(function ($) { $('#regdate').datepicker({ dateFormat: 'yy-mm-dd' }); $('#expdate').datepicker({ dateFormat: 'yy-mm-dd' }); })(jQuery);", array('type' => 'inline', 'scope' => 'footer', 'weight' => 5));
+
+		$output = NULL;
+
+		if(isset($_POST['update']))
+		{
+			$num_updated = db_update('abonner') 
+								  	->fields(array(
+										'frm_tittel' => $_POST['tittel'],
+										'frm_epost' => $_POST['epostadresse'],
+										'frm_uid' => $_POST['userid'],
+										'frm_telefonnummer' => $_POST['telphone'], 
+								    	'frm_date' => $_POST['regdate'],
+								    	'frm_expire_date' => $_POST['expdate']
+								  	))
+								  	->condition('frm_id', $_POST['frmid'])
+								  	->execute();
+
+		}
+
+		$query = db_select('abonner', 'A');
+		
+		$query->fields('A', array('frm_id', 'frm_usertype', 'frm_vnaven', 'frm_kontaktperson', 'frm_telefonnummer', 'frm_tittel', 'frm_epost', 'frm_meldingsfelt', 'frm_expire_date','	frm_date', 'frm_uid'));
+
+		$query->condition('A.frm_id', arg(4));
+
+		$query->orderBy('A.frm_id', 'DESC');
+
+		$arrRegData = $query->execute();
+
+		$output.= '<style type="text/css">
+		.post-content, 
+		.post-form{
+			padding: 20px;
+			border: 1px solid #CCC;
+			margin-bottom: 30px;
+		}
+
+		.post-content ul{
+			margin: 0px;
+			padding: 0px;
+			list-style: none;
+		}
+
+		.post-content ul li{
+			margin-bottom: 20px;
+		}
+
+		.post-content ul li:last-child{
+			margin-bottom: 0px;
+		}
+
+		.post-content strong{
+			display: inline-block;
+		}
+
+		.post-content p{
+			display: inline-block;
+			margin: 0px;
+		}
+
+		.post-form label{
+			font-weight: normal;
+			margin-bottom: 10px;
+		}
+
+		.post-form label span{
+			display: inline-block;
+			vertical-align: bottom;
+		}
+
+		.post-form label input{
+			display: inline-block;
+			border-bottom: 1px solid #CCC;
+			padding: 10px;
+			width: 500px;
+			vertical-align: bottom;
+		}
+
+		.post-form input[type="submit"]{
+			padding: 10px 20px;
+			border: 0px;
+			margin-top: 30px;
+			cursor: pointer;
+		}
+	</style>';
+
+		foreach ($arrRegData as $rowData) 
+		{
+			$output.= '<form action="" method="post" >';
+			$output.= '<div class="post-content">';
+			$output.= '<ul>';
+			$output.= '<li>';
+			$output.= '<strong>N/A: </strong> <p>'.$rowData->frm_usertype. '</p>';
+			$output.= '</li>';
+			$output.= '<li>';
+			$output.= '<strong>Navn: </strong> <p>'.$rowData->frm_vnaven. '</p>';
+			$output.= '</li>';
+			$output.= '<li>';
+			$output.= '<strong>Kontaktperson: </strong> <p>' .$rowData->frm_kontaktperson. '</p>';
+			$output.= '</li>';
+			$output.= '</ul>';
+			$output.= '</div>';
+
+			$output.= '<div class="post-form">';
+
+			$output.= '<label>';
+			$output.= '<span>Leverand&oslash;rdatabasen User ID: </span><input type="text" value="'.$rowData->frm_uid.'" name="userid" id ="userid" />';
+			$output.= '</label>';
+			
+			$output.= '<label>';
+			$output.= '<span>Firma : </span><input type="text" value="'.$rowData->frm_tittel.'" name="tittel" id ="tittel" />';
+			$output.= '</label>';
+			
+			$output.= '<label>';
+			$output.= '<span>Telefon : </span><input type="text" value="'.$rowData->frm_telefonnummer.'" name="telphone" id ="telphone" />';
+			$output.= '</label>';
+
+			$output.= '<label>';
+			$output.= '<span>E-postadresse : </span><input type="text" value="'.$rowData->frm_epost.'" name="epostadresse" id ="epostadresse" />';
+			$output.= '</label>';
+			
+			$output.= '<label>';
+			$output.= '<span>Abbonementsdato: </span><input type="text" value="'.$rowData->frm_date.'" name="regdate" id ="regdate" />';
+			$output.= '</label>';
+
+			$output.= '<label>';
+			$output.= '<span>Neste faktura dato: </span><input type="text" value="'.$rowData->frm_expire_date.'" name="expdate" id="expdate" />';
+			$output.= '</label>';
+
+			$output.= '<input type="submit" value="Lagre" name="update" />';
+
+			$output.= '<input type="hidden" value="'.$rowData->frm_id.'" name="frmid" />';
+
+			$output.= '</div>';
+
+			$output.= '</form>';
+		}
+
+		return $output;	 
+	}
+	
+	
+	function data_form_login_redirect_user_login(&$edit, $account) {
+		
+		$edit['redirect'] = '<front>'; 
+		
+		//global $base_url;  
+		//drupal_register_shutdown_function('login_redirect_perform_redirect', $base_url.'/kommunaldata');
+	}
+	
+	function login_redirect_perform_redirect($destination) {
+		drupal_goto($destination, array('external' => TRUE));
+	}
+	

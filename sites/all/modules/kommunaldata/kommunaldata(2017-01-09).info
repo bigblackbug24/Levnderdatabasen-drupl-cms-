@@ -1,0 +1,14 @@
+name = Kommunal Data
+description = Kommunal data by Fylke/Kommune Id
+package = Kommunal Modules
+core = 7.x
+
+version = "7.x-1.0"
+core = "7.x"
+
+scripts[] = js/highcharts.js
+scripts[] = js/exporting.js
+scripts[] = js/stickySidebar.js
+scripts[] = js/jquery.validate.min.js
+
+

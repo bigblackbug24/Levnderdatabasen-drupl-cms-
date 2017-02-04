@@ -1,0 +1,172 @@
+<?php
+header('X-Frame-Options: GOFORIT'); 
+function cross_promotion_municipal_council_piechart_menu() {
+    $items = array();
+
+    $items['cross_promotion_municipal_council_piechart/municipal_council_piechart'] = array(
+        'title' => '',
+        'page callback' => 'municipal_council_piechart',
+        'access arguments' => array('access content'),
+        'type' => MENU_CALLBACK,
+     );
+
+    return $items;
+}
+
+function municipal_council_piechart($kommuneId, $dataYear,$kommuneName) {
+   global $base_url;
+    global $user;
+    $kommuneId = $_GET['var1'];
+    $dataYear = $_GET['var2'];
+      $kommuneName=$_GET['var3'];
+    $output = NULL;
+    db_set_active('kommunaldata');
+    $logoPath = $base_url."/sites/default/files/komlogo/".$kommuneId.".gif";
+		
+		$output.= '<div class="right-content">';
+		$output.= '	<div class="logo-widget" style="margin-left:0px;">';
+		$output.= '		<img src="'.$logoPath.'" title="'.$kommuneName.'" width="75" />';
+		$output.= '		<h1>'.$kommuneName.'</h1>';
+		$output.= '	</div>';
+    $query = db_select('kommune', 'A');
+		$query->join('kommune_innbyggere', 'B', 'A.kommune_id = B.kommune_id AND B.innbygger_year ='.$dataYear);
+		$query->fields('A', array('kommune_id', 'kommune_navn', 'kommune_ordforer', 'kommune_parti', 'kommune_periode', 'kommune_adviser', 'kommune_forretningsadr', '	kommune_forradrpostnr', 'kommune_forradrpoststed', 'kommune_postadresse', '	kommune_ppostnr', 'kommune_ppoststed', 'kummune_telefon', 'kommune_kontaktinfo', 'kommune_kontaktinfo', 'kommune_hjemmeside'));
+		$query->fields('B', array('innbygger', 'kommune_group'));
+		$query->condition('A.kommune_id', $kommuneId, '=');
+		$kommuneData = $query->execute();
+               
+		
+		db_set_active();
+		
+		$kommuneId = $kommuneName = $kommuneMayor = $kommuneParti = $kommunePeriod = $kommuneAdv = $kommunePhone = $kommuneEmail = $kommuneUrl = NULL;
+		
+		$kommuneGroup = $innbyggerTotal = 0;
+		
+		foreach ($kommuneData as $dataRow) 
+		{
+			$kommuneId = $dataRow->kommune_id;
+			$kommuneName = $dataRow->kommune_navn;
+			$kommuneMayor = $dataRow->kommune_ordforer;
+			$kommuneParti = $dataRow->kommune_parti;
+			$kommunePeriod = $dataRow->kommune_periode;
+			$kommuneAdv = $dataRow->kommune_adviser;
+			$kommunePhone = $dataRow->kummune_telefon;
+			$kommuneEmail = $dataRow->kommune_kontaktinfo;
+			$kommuneUrl = $dataRow->kommune_hjemmeside;
+			$innbyggerTotal = $dataRow->innbygger;
+			$kommuneGroup = $dataRow->kommune_group;	
+			
+			$kommuneForretningsadr = $dataRow->kommune_forretningsadr;
+			$kommuneForradrpostnr = $dataRow->kommune_forradrpostnr;
+			$kommuneForradrpoststed = $dataRow->kommune_forradrpoststed;
+			$kommunePostadresse = $dataRow->kommune_postadresse;
+			$kommunePpostnr = $dataRow->kommune_ppostnr;
+			$kommunePpoststed = $dataRow->kommune_ppoststed;
+		}	
+    db_set_active('kommunaldata');	
+	
+			$query = db_select('kommune_members', 'A');
+			$query->fields('A', array('kommune_parti', 'kommune_parti_member'));
+			$query->condition('A.kommune_id', $kommuneId);
+			$query->orderBy('A.kommune_parti_member', 'DESC');
+			$results = $query->execute();
+                        
+   $output.= '<div class="graph-panel">';
+			$output.= '	<center><h3>'.$kommuneName.' Kommunestyre ('.$kommunePeriod.')</h3></center>';
+			$output.= '	<div class="graph-widget">';
+			
+			$output.= '<script>';
+			$output.= '$( document ).ready(function() {';
+			$output.= '	$("#container").highcharts({';
+			$output.= '		chart: {';
+			$output.= '			type: "pie"';
+                        
+			$output.= '		},';
+                        
+			$output.= '		title: {';
+			$output.= '			text: "'.$kommuneName.' Kommunestyre ('.$kommunePeriod.')"';
+			$output.= '		},';
+			$output.= '		plotOptions: {';
+	        $output.= '	    series: {';
+	        $output.= '        dataLabels: {';
+	        $output.= '            enabled: true,';
+	        $output.= '            format: "{point.name}: {point.y}"';
+	        $output.= '        }}},';
+			
+			$output.= '		tooltip: {';
+			$output.= '			headerFormat: "",';
+			$output.= '			pointFormat: "{point.name}: <b>{point.y}</b>"';
+			$output.= '		},';
+			$output.= '		series: [{';
+			$output.= '			name: "Brands",';
+			
+			
+						
+			db_set_active();		
+			
+			$output.= ' data: [';
+			foreach($results as $result)
+			{
+				if($result->kommune_parti_member < 1)
+					continue;
+					
+				$output.= ' {  name: "'.$result->kommune_parti.'", y: '.$result->kommune_parti_member.' }, ';
+			}
+			
+			$output.= ' ]';
+			$output.= ' }]';
+			$output.= '	});';
+			$output.= '});';
+			$output.= '</script>';
+		
+			$output.= '<div id="container" style="min-width: 310px; height: 400px; max-width: 600px; margin: 0 auto"></div>';
+
+			$output.= ' <div>Kilde Levand&oslash;rdatabase</div>';	
+			
+			$output.= '	</div>';
+			$output.= '	<h3>Utlysninger fra Doffin</h3>';
+			$output.= '<i>Her vises utlysninger av offentlige anbud i '.$kommuneName.' hvor tilbudsfristen ikke er gått ut. Klikk på anbudet for å se full utlysningstekst fra Doffin.</i>';
+			$output.= '	<div class="graph-widget">';
+			
+			db_set_active('doffindata');	
+			
+			$query = db_select('doffin', 'D');
+			$query->fields('D', array('tittel', 'fylke', 'kommune', 'oppdragsurl', 'type', 'tilbudsfrist'));
+			$query->condition('D.kommune', $kommuneName);
+			$query->condition('D.tilbudsfrist', date('Y-m-d'), '>=');
+			$query->orderBy('D.tilbudsfrist', 'ASC');
+			
+			$objDoffin = $query->execute();
+						
+			db_set_active();	
+			
+			$output.= '<table class="table-view" cellpadding="0" cellspacing="0" width="100%">';
+			$output.= '		<thead>';
+			$output.= '			<tr>';
+			$output.= '				<th width="40%">Tittel</th>';
+			$output.= '				<th width="20%">Kommune</th>';
+			$output.= '				<th width="20%">Type</th>';
+			$output.= '				<th width="20%">Tilbudsfrist</th>';
+			$output.= '			</tr>';
+			$output.= '		</thead>';
+			$output.= '	<tbody>';	
+			
+			
+			foreach($objDoffin as $rowData)
+			{
+				$output.= '		<tr>';
+				$output.= '			<td><a href="'.$rowData->oppdragsurl.'" target="_blank">'.$rowData->tittel.'  <span class="glyphicon glyphicon-link" aria-hidden="true"></span></a></td>';
+				$output.= '			<td>'.$rowData->kommune.'</td>';
+				$output.= '			<td>'.$rowData->type.'</td>';
+				$output.= '			<td>'.$rowData->tilbudsfrist.'</td>';
+				$output.= '		</tr>';
+			}
+			
+			$output.= '		</tbody>';
+			$output.= '		</table>';
+			
+			$output.= '	</div>';			
+		
+               		
+		return $output;
+	}

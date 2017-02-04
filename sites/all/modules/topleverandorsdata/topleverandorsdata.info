@@ -1,0 +1,7 @@
+name = Top Leverandors Data
+description = Get Top 100 Leverandors of Fylke/Kommune
+package = Kommunal Modules
+core = 7.x
+
+version = "7.x-1.0"
+core = "7.x"

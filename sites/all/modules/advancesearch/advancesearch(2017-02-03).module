@@ -1,0 +1,484 @@
+<?php
+
+function advancesearch_menu() 
+	{
+		$items = array();
+
+		$items['advancesearch'] = array(
+			'type' => MENU_CALLBACK,
+			'title' => t('Advance Search'),
+			'page callback' => 'drupal_get_form',
+			'access callback' => 'user_is_logged_in',
+			'page arguments' => array('advance_search_filter_form'),
+		);
+		
+		$items['exportsearch'] = array(
+			'type' => MENU_CALLBACK,
+			'title' => t('Advance Search'),
+			'page callback' => 'download_csv_results',
+			'access arguments' => array('access content'),
+		);
+		
+		return $items;	
+	}
+
+	function advance_search_filter_form($form, &$form_state) 
+	{
+			
+		$form['#redirect'] = false;
+		
+		$yoptions = getDataYear();
+				
+		$form['datayear'] = array(
+			'#type' => 'select',
+			'#title' => t('&Aring;r: '),
+			'#default_value' => NULL,
+			'#options' => $yoptions
+		);
+		
+		$fkOptions = getFylkeKommuneList();
+	
+		$form['fkdropdown'] = array(
+			'#type' => 'select',
+			'#title' => t('Fylke / Kommune: <a href="#" data-toggle="tooltip" title="Du kan velge inntill 10 Kommuner/Fylker &aring; vise data for"><i class="fa fa-question-circle"></i></a>'),
+			'#default_value' => NULL,
+			'#options' => $fkOptions, 
+			'#multiple' => TRUE,
+			'#id' => 'fktokenize',
+			'#attributes' => array(
+									'class' => array('tokenize-sample'),
+									'title' => t("Item's name, no longer than 45 characters."),
+									'' => "tooltip"
+								),
+	
+		);
+		
+		$form['suppliername'] = array(
+        	'#type' => 'select',
+        	'#title' => t('Leverand&oslash;r: <a href="#" data-toggle="tooltip" title="Du kan velge inntill 10 leverand&oslash;rer &aring; vise data for"><i class="fa fa-question-circle"></i></a>'),
+    		'#multiple' => TRUE,
+            '#id' => 'supplierids',
+            '#attributes' => array('class' => array('tokenize-sample')),
+		);
+				
+		$groupCodeList = getGroupSubclassData(3);
+
+		$form['groupclass'] = array(
+			'#type' => 'select',
+			'#title' => t('Hovedbransjer: <a href="#" data-toggle="tooltip" title="Du kan velge inntill 10 hovedbransjer &aring; vise data for"><i class="fa fa-question-circle"></i></a>'),
+			'#default_value' => NULL,
+			'#options' => $groupCodeList,
+			'#multiple' => TRUE,
+			'#id' => 'groupctokenize',
+			'#attributes' => array('class' => array('tokenize-sample')),
+		);
+		
+		$subClassList = getGroupSubclassData(5);
+
+		$form['subsectorclass'] = array(
+			'#type' => 'select',
+			'#title' => t('Bransje: <a href="#" data-toggle="tooltip" title="Du kan velge inntill 10 bransjer &aring; vise data for"><i class="fa fa-question-circle"></i></a>'),
+			'#default_value' => NULL,
+			'#options' => $subClassList,
+			'#multiple' => TRUE,
+			'#id' => 'subctokenize',
+			'#attributes' => array('class' => array('tokenize-sample')),
+		);
+
+		$form['minravenu'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Minst Kj&oslash;pt: <a href="#" data-toggle="tooltip" title="Velge minste &aring;rlige salgsbel&oslash;p du &oslash;nsker &aring; vise"><i class="fa fa-question-circle"></i></a>'),
+		);
+		
+		$form['maxravenu'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Maks Kj&oslash;pt: <a href="#" data-toggle="tooltip" title="Velge minste &aring;rlige salgsbel&oslash;p du &oslash;nsker &aring; vise"><i class="fa fa-question-circle"></i></a>'),
+		);
+		
+		$form['submit'] = array(
+        	'#type'=>'submit',
+        	'#value'=> t('Search'),
+      
+      	);
+			
+		$form['reset'] = array(
+			'#type' => 'button',
+			'#button_type' => 'reset',
+			'#value' => t('Nullstill'),
+			'#id' => 'resetbtn',
+			'#attributes' => array(
+			    'onclick' => 'this.form.reset(); return false;',
+			),
+    	);
+		
+    	if (!empty($form_state['results_table'])) {
+			$form['results_table'] = array('#markup' => $form_state['results_table']);
+			$form['suppids'] = array('#value' => $form_state['suppids'] );			
+		}
+		
+		return $form;
+	}
+	
+	function advance_search_filter_form_submit($form, &$form_state)
+	{
+		$nDataYear = $form_state['values']['datayear'];
+		$arrFKId = $form_state['values']['fkdropdown'];
+		
+		$strFKIDs = array();
+		foreach($arrFKId as $fkId)
+		{
+			if(empty($fkId))
+				continue;
+				
+			$arrFkId = explode('-', $fkId);
+			$strFKIDs[] = $arrFkId[1];
+		}		
+		
+		/////////////////////////////////////////////////////////////////////
+		
+		$strSupplierName = $form_state['values']['suppliername'];
+		
+		$strSuppIDs = array();
+		if(!empty($strSupplierName))
+		{
+			foreach($strSupplierName as $strSuppID)
+			{
+				if(empty($strSuppID))
+					continue;
+					
+				$strSuppIDs[] = $strSuppID;
+			}	
+		}		
+
+		/////////////////////////////////////////////////////////////////
+				
+		$arrGroupClass = $form_state['values']['groupclass'];
+		
+		$strGroupClassIDs = array();
+		if(!empty($arrGroupClass))
+		{
+			foreach($arrGroupClass as $subGroupId)
+			{
+				if(empty($subGroupId))
+					continue;
+					
+				$strGroupClassIDs[] = $subGroupId;
+			}		
+		}		
+		////////////////////////////////////////////////////////////////////
+		
+		$arrSubsectorClass = $form_state['values']['subsectorclass'];
+		
+		$strSubClassIDs = array();
+		if(!empty($arrSubsectorClass))
+		{
+			foreach($arrSubsectorClass as $subClassId)
+			{
+				if(empty($subClassId))
+					continue;
+					
+				$strSubClassIDs[] = $subClassId;
+			}		
+		}
+
+		$nMinRavenu = $form_state['values']['minravenu'];
+		$nMaxRavenu = $form_state['values']['maxravenu'];
+		
+		$nMinRavenu = str_replace(" ", "", $nMinRavenu);
+				
+		$htmlFilteredData = show_filtered_data($strFKIDs, $nDataYear, $strSuppIDs, $strGroupClassIDs, $strSubClassIDs, $nMinRavenu, $nMaxRavenu);
+
+		$form_state['results_table'] = $htmlFilteredData;
+		
+		$form_state['suppids'] = $strSuppIDs;
+		
+		$form_state['rebuild'] = TRUE;
+		
+	}
+	
+	function advancesearch_theme() 
+	{
+		
+		$items = array();
+				
+		$items['advance_search_filter_form'] = array(
+			'render element' => 'form',
+			'path' => drupal_get_path('theme', 'leverandors') . '/templates/forms',
+			'template' => 'advance_search',
+		);
+	
+		return $items;
+		
+	}
+	
+	function show_filtered_data($kommuneIds, $dataYear, $supplierId, $strGroupClass, $strSubsectorClass, $nMinRavenu, $nMaxRavenu) 
+	{		
+		global $base_url;
+
+		db_set_active('kommunaldata');	
+		
+		$query = db_select('leverandor_data', 'A');
+		
+		$query->fields('A', array('ld_orgnr', 'ld_orgnavn', 'ld_kommune_id', 'ld_kommune_navn', 'ld_kommune_type', 'ld_group_name','ld_group', 'ld_subclass', 'ld_subclass_name', 'ld_revenue'));
+		$query->condition('A.ld_data_year', $dataYear);	
+		
+		if(!empty($kommuneIds))
+			$query->condition('A.ld_kommune_id',($kommuneIds), 'IN');
+				
+		if(!empty($supplierId))
+			$query->condition('A.ld_orgnr', ($supplierId), 'IN');	
+		
+		if(!empty($strGroupClass))
+			$query->condition('A.ld_group', ($strGroupClass), 'IN');	
+		
+		if(!empty($strSubsectorClass))
+			$query->condition('A.ld_subclass', ($strSubsectorClass), 'IN');	
+		
+		if($nMinRavenu > 0)
+			$query->condition('A.ld_revenue', $nMinRavenu, '>=');	
+
+		if($nMaxRavenu > 0)
+			$query->condition('A.ld_revenue', $nMaxRavenu, '<=');	
+			
+		$query->orderBy('A.ld_revenue', 'DESC');
+
+		$arrTotalData = $query->execute();
+
+		$query->range(0, 250);
+		
+		$_SESSION['dataquery'] = $query;
+		$_SESSION['datayear'] = $dataYear;
+				
+		$arrFilteredData = $query->execute();
+	
+		db_set_active();
+
+		$totalRecords = $arrTotalData->rowCount();
+
+		$selectedRecords = $arrFilteredData->rowCount();
+
+		$output = NULL;
+				
+		$output.= '<div class="right-content">';
+		$output.= '	<div class="info-box">';
+		$output.= '		<div class="inner-box">';
+		$output.= 'Her viser vi inntil 250 rader av dataene i databasen sorter synkende etter innkj&oslash;p. &Oslash;nsker du &aring; se mer data kan du ta kontakt med oss. <br><br>';
+		$output.= '<a href="'.$base_url.'/?q=abonner">Kontakt oss</a><br /><br/>Viser '.$selectedRecords.' av '.$totalRecords.' rader';
+;
+
+		$output.= '<br/><br/><a href="'.$base_url.'/exportsearch" target="_blank" style="color: #fff; background-color: #053366; padding: 6px 35px;   font-size: 14px; border-radius: 4px;">Eksporter til Excel</a>';
+		
+		$output.= '		</div>';
+		$output.= '	</div>';
+		$output.= '</div>';
+
+		$output.= '<div class="table-view-panel">';
+		$output.= '	<a href="#" class="tooltipwhite" data-toggle="tooltip" title="Kj&oslash;pt i 1000"><i class="fa fa-question-circle"></i></a>';
+		$output.= '<div class="table-view">';
+		$output.= '<table class="table-view" cellpadding="0" cellspacing="0" width="100%">';
+		$output.= '		<thead>';
+		$output.= '			<tr>';
+		$output.= '				<th width="22%">Leverand&oslash;r </th>';
+		$output.= '				<th width="22%">Hovedbransje</th>';
+		$output.= '				<th width="22%">Bransje</th>';
+		$output.= '				<th width="22%">Kommune/Fylke</th>';
+		$output.= '				<th width="20%" class="rightalign">Kj&oslash;pt '.$dataYear.'</th>';				
+		$output.= '			</tr>';
+		$output.= '		</thead>';
+		$output.= '	<tbody>';		
+		
+		$num=1;	
+		
+		if(!empty($arrFilteredData))
+		{
+			foreach($arrFilteredData as $rowData)
+			{
+				$bgcolor = ($num % 2 === 0) ? 'class="rowBackground"' : NULL;
+	
+				$output.= '<tr '.$bgcolor.' >';
+				$output.= '	<td width="20%">'.$num.' - <a href="'.$base_url.'/levrandordata/'.$rowData->ld_orgnr.'/'.$dataYear.'" target="_blank">'.$rowData->ld_orgnavn.'</a></td>';
+				
+				$output.= '	<td width="20%"><a href="'.$base_url.'/groupdatacard/'.$rowData->ld_group.'/'.$dataYear.'" target="_blank">'.$rowData->ld_group_name.'</a></td>';
+				
+				$output.= '	<td width="20%"><a href="'.$base_url.'/groupdatacard/'.$rowData->ld_group.'/'.$dataYear.'" target="_blank">'.$rowData->ld_subclass_name.'</a></td>';
+				
+
+				if($rowData->ld_kommune_type == 'kommune')
+					$output.= '	<td width="20%"><a href="'.$base_url.'/kommundata/'.$rowData->ld_kommune_id.'/'.$dataYear.'" target="_blank">'.$rowData->ld_kommune_navn.'</a></td>';	
+				else
+					$output.= '	<td width="20%"><a href="'.$base_url.'/fylkedata/'.$rowData->ld_kommune_id.'/'.$dataYear.'" target="_blank">'.$rowData->ld_kommune_navn.'</a></td>';		
+				
+				$output.= '	<td width="20%" class="rightalign">'.numberFormat($rowData->ld_revenue/1000, 0).'</td>';
+				$output.= '</tr>';
+				$num++;
+			}
+		}
+
+		$output.= '	</tbody>';
+		$output.= '</table> ';
+		$output.= '</div>';
+		$output.= '</div>';
+		$output.= '<br/><br/><a href="'.$base_url.'/exportsearch" target="_blank" style="color: #fff; background-color: #053366; padding: 6px 35px;   font-size: 14px; border-radius: 4px;">Eksporter til Excel</a>';
+		
+		return $output;
+	}
+	
+	function download_csv_results()
+	{
+		module_load_include('inc', 'phpexcel');
+		
+		$dataYear = $_SESSION['datayear'];
+		$strQuery = $_SESSION['dataquery'];
+		
+		$arrFilteredData = $strQuery->execute();
+		
+		$data = array();
+		$headers = array();
+								
+		$headers['rows'] = array_values(array( 'Leverandor', 'Hovedbransje', 'Bransje', 'Kommune/Fylke', 'Kjopt'.$dataYear ));
+		
+		foreach($arrFilteredData as $rowData) 
+		{
+			$arrData = array( $rowData->ld_orgnavn, $rowData->ld_group_name, $rowData->ld_subclass_name, $rowData->ld_kommune_navn, $rowData->ld_revenue );
+			$data['rows'][] = array_values($arrData);
+		}
+		
+		// Store the file in sites/default/files
+		$dir = file_stream_wrapper_get_instance_by_uri('public://')->realpath();
+		$filename = 'result_data_'.date('is').'.xls';
+		$path = "$dir/$filename";
+		
+		// Use the .xls format
+		$options = array('format' => 'xls');
+		
+		$result = phpexcel_export($headers, $data, $path, $options);
+		
+		if ($result == PHPEXCEL_SUCCESS) 
+		{
+			header('Content-type: application/ms-excel');
+			header('Content-Disposition: attachment; filename='.basename($path));
+	
+			ob_clean();
+			flush();
+			readfile($path);
+			
+			drupal_set_message(t("File download successfully !"));
+		}
+		else 
+		{
+			drupal_set_message(t("Oops ! An error occured !"), 'error');
+		} 
+		
+		unlink($path);
+	}
+	
+	function show_filtered_data_old($kommuneIds, $dataYear, $supplierId, $strGroupClass, $strSubsectorClass) 
+	{
+		global $base_url;
+		$output = NULL;
+
+		$header = array(
+			  'Leverand�r' => array('data' => t('Leverand�r'), 'field' => 'A.ld_orgnavn'),
+			  'Group' => array('data' => t('Group'), 'field' => 'A.ld_group_name'),
+			  'Subclass' => array('data' => t('Subclass'), 'field' => 'A.ld_subclass_name'),
+			  'Kommune Name' => array('data' => t('Kommune Name'), 'field' => 'A.ld_kommune_navn'),
+			  'Revenue 2013' => array('data' => t('Revenue '.$dataYear), 'field' => 'A.ld_revenue' ,  'sort' => 'DESC')
+		);
+		
+		db_set_active('kommunaldata');	
+		
+		$query = db_select('leverandor_data', 'A');
+		$query->fields('A', array('ld_orgnr', 'ld_orgnavn', 'ld_kommune_id', 'ld_kommune_navn', 'ld_group_name', 'ld_subclass_name', 'ld_revenue'));
+		$query->condition('A.ld_data_year', $dataYear);	
+		
+		if(!empty($kommuneIds))
+			$query->condition('A.ld_kommune_id',($kommuneIds), 'IN');
+				
+		if(!empty($supplierId))
+			$query->condition('A.ld_orgnr', $supplierId);	
+		
+		if(!empty($strGroupClass))
+			$query->condition('A.ld_group', ($strGroupClass), 'IN');	
+		
+		if(!empty($strSubsectorClass))
+			$query->condition('A.ld_subclass', ($strSubsectorClass), 'IN');	
+			
+		$query->orderBy('A.ld_revenue', 'DESC');
+		
+		$query = $query->extend('PagerDefault')->limit(50);
+		
+		$arrFilteredData = $query->execute();
+		
+		db_set_active();
+				
+		foreach($arrFilteredData as $rowData)
+		{
+			$options[$rowData->ld_orgnr] = array(
+				'Leverand�r' => $rowData->ld_orgnavn,
+				'Group' => $rowData->ld_group_name,
+				'author' => $rowData->ld_subclass_name,
+				'Kommune Name' => $rowData->ld_kommune_navn,
+				'Revenue 2013' => $rowData->ld_revenue,
+			);
+		}
+		
+		$output = theme('table', array(
+			'header'=> $header,
+		  	'rows'  => $options,
+		  	'empty' => t('No Data Available'),
+			'sticky' => TRUE,
+			'sortable' => FALSE
+		));
+		
+		$output.=  theme('pager', array(
+											'parameters' => array(
+												'kommunes' => $kommuneIds,
+												'datayearw' => $dataYear,
+												'supid' => $supplierId,
+												'groupids' => $strGroupClass,
+												'subids' => $strSubsectorClass,
+											),
+										)
+							);
+												
+		return $output;
+
+	}
+	
+	function advancesearch_form_alter(&$form, &$form_state, $form_id) 
+	{ 	
+  		if($form_id == 'user_login') {
+		
+			$form['links']['#markup'] = '<a href="/user/password" title="Glemt passord">Glemt passord?</a>';
+
+			unset($form['name']['#description']);	
+			unset($form['pass']['#description']);	
+  		}
+		
+		if($form_id == 'user_profile_form') {
+
+			unset($form['locale']);
+			//unset($form['locale']['language']);
+			
+			unset($form['timezone']);
+			//usset($form['timezone']['timezone']);
+
+  		}
+	}
+	
+	function advancesearch_user_update(&$edit, $account, $category) {
+
+		$num_updated = db_update('abonner')
+					  ->fields(array(
+							'frm_telefonnummer' => $account->field_user_phone['und'][0]['value'],
+						  ))
+					  ->condition('frm_uid', $account->uid, '=')
+					  ->execute();
+	}
+
+	
+	
+	
+
+
+	

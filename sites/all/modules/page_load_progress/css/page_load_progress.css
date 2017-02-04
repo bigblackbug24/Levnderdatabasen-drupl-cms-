@@ -1,0 +1,24 @@
+.page-load-progress-lock-screen {
+  
+  height: 100%;
+  left: 0;
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 9998;
+}
+
+.page-load-progress-lock-screen.loadhidden {
+  display: none;
+}
+
+.page-load-progress-spinner {
+  background-image: url('../images/loader.gif');
+  background-repeat: no-repeat;
+  height: 295px;
+  left: 40%;
+  position: absolute;
+  top: 32%;
+  width: 295px;
+  z-index: 9999;
+}

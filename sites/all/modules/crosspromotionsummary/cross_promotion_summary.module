@@ -1,0 +1,170 @@
+<?php
+header('X-Frame-Options: GOFORIT'); 
+function cross_promotion_summary_menu() {
+    $items = array();
+
+    $items['cross_promotion_summary/summary_detail'] = array(
+        'title' => '',
+        'page callback' => 'summary_record',
+        'access arguments' => array('access content'),
+        'type' => MENU_CALLBACK,
+     );
+
+    return $items;
+}
+
+function summary_record($kommuneId, $fylkeId, $dataYear,$kommuneName) {
+   global $base_url;
+    global $user;
+    $kommuneId = $_GET['var1'];
+    $dataYear = $_GET['var2'];
+    $kommuneName=$_GET['var3'];
+
+    $output = NULL;
+   db_set_active('kommunaldata');
+    //db_set_active('kommunaldata');	
+		
+		
+				
+		$logoPath = $base_url."/sites/default/files/komlogo/".$kommuneId.".gif";
+		
+		$output.= '<div class="right-content">';
+		$output.= '	<div class="logo-widget" style="margin-left:0px;">';
+		$output.= '		<img src="'.$logoPath.'" title="'.$kommuneName.'" width="75" />';
+		$output.= '		<h1>'.$kommuneName.'</h1>';
+		$output.= '	</div>';
+		// Get kommune Procurement Information;
+		$query = db_select('fk_procurement', 'A');
+		$query->fields('A', array('fk_data_year', 'fk_total_supplier', 'fk_above_mill_supplier', 'fk_total_invoice'));
+		$query->condition('A.fk_kommune_id', $kommuneId, '=');
+		//$query->condition('A.fk_data_year', $dataYear, '=');
+
+		$kommuneProcurements = $query->execute();
+		
+		// Get Group Procurement Information;
+		$query = db_select('kommune_procurement', 'A');
+		$query->fields('A', array('pro_total_kommune', 'pro_total_invoice', 'pro_total_suppliers', 'pro_total_over_mill'));
+		$query->condition('A.pro_group', $kommuneGroup, '=');
+		$query->condition('A.pro_year', $dataYear, '=');
+
+		$groupProcurements = $query->execute();
+		
+		db_set_active();
+		
+		$kommuneTotalSupplier = $kommuneTotalSupplierOverMill = $kommuneTotalInvoice = 0;
+
+		foreach($kommuneProcurements as $rowData)
+		{
+			if($dataYear == $rowData->fk_data_year)
+			{
+				$kommuneTotalSupplier = $rowData->fk_total_supplier;
+				$kommuneTotalSupplierOverMill = $rowData->fk_above_mill_supplier;
+				$kommuneTotalInvoice = $rowData->fk_total_invoice;
+			}			
+			
+			$xAxis.= $rowData->fk_data_year.',';
+			$yAxis.= $rowData->fk_total_invoice.',';
+			
+		}
+		
+		$groupTotalSupplier = $groupTotalSupplierOverMill = $groupTotalInvoice = $groupTotalkommune = 0;
+
+		foreach($groupProcurements as $rowData) {
+			$groupTotalSupplier = $rowData->pro_total_suppliers;
+			$groupTotalSupplierOverMill = $rowData->pro_total_over_mill;
+			$groupTotalInvoice = $rowData->pro_total_invoice;
+			$groupTotalkommune = $rowData->pro_total_kommune;
+		}
+		$output.= '<center><h3>Sammendrag / Oversikt</h3></center>';	
+		 //$output.= '<h3>Sammendrag / Oversikt &nbsp;&nbsp;<a href="http://leverandordatabasen.westeurope.cloudapp.azure.com/drupal/summary/summary_detail?var1='.$kommuneId.'&var2='.$dataYear.'&var3='.$kommuneName.'" target="_blank">Show Summary </a></h3></tr>';	
+             //   $output.= '<tr><td><a href="http://leverandordatabasen.westeurope.cloudapp.azure.com/drupal/summary/summary_detail" target="_blank">Show Summary </a></td><td>123</td></tr>';
+
+                
+		$output.= '<i>Denne tabelen viser totalt innkjøp for '.$kommuneName.' i '.$dataYear.', sammenlignet med innkjøp fra kommuner i samme størrelse. (For fylker er gjennomsnittet beregnet med bakgrunn i alle fylker)</i>';
+		$output.= '<table class="table-view" cellpadding="0" cellspacing="0" width="100%">';
+		$output.= '		<thead>';
+		$output.= '			<tr>';
+		$output.= '				<th width="33%">&nbsp;</th>';
+
+		
+			$output.= '<th width="33%" class="rightalign">'.$kommuneName.' <a href="#" data-toggle="tooltip" class="tooltipwhite" title="Kj&oslash;pt i 1000"><i class="fa fa-question-circle"></i></a></th>';
+		
+		
+		$output.= '<th width="33%" class="rightalign"> Gj. snitt <a href="#" class="tooltipwhite" data-toggle="tooltip" title="Gj. snitt for kommuner av samme størrelse. Kjøpt i 1000"><i class="fa fa-question-circle"></i></a></th>';
+		
+		$output.= '			</tr>';
+		$output.= '		</thead>';
+		$output.= '	<tbody>';
+		
+		$output.= '<tr>';
+		$output.= '<td>Anskaffelser totalt</td>';
+
+		$output.= '<td class="rightalign"> '.round($kommuneTotalInvoice / 1000000).' mill</td>';
+                
+		$output.= '<td class="rightalign">'.round(($groupTotalInvoice/$groupTotalkommune) / 1000000).' mill</td>';
+		$output.= '</tr>';
+
+		$output.= '<tr>';
+		$output.= '<td>Antall leverandører</td>';
+	$output.= '<td class="rightalign">'.$kommuneTotalSupplier.'</td>';
+		
+
+		$output.= '<td class="rightalign">'.round($groupTotalSupplier/$groupTotalkommune).'</td>';
+		$output.= '</tr>';
+
+		$output.= '<tr>';
+		$output.= '<td>Antall leverandører over 1 mill</td>';
+		
+		
+			$output.= '<td class="rightalign">'.$kommuneTotalSupplierOverMill.'</td>';
+		
+
+		$output.= '<td class="rightalign">'.round($groupTotalSupplierOverMill/$groupTotalkommune).'</td>';
+		$output.= '		</tr>';
+
+		$output.= '	</tbody>';
+		$output.= '</table>';
+
+
+
+		
+			$output.= '<div class="info-colum">';
+			$output.= '	<div class="graph">';				
+			$output.= '<script>';
+			$output.= '	$( document ).ready(function() {';
+			$output.= '		$("#invoiceData").highcharts({';
+			$output.= '			title: {';
+			$output.= '				text: "Innkjøp '.$kommuneName.'",';
+			$output.= '				x: -20';
+			$output.= '			},';
+			$output.= '			xAxis: {';
+			$output.= '				categories: ['.$xAxis.']';
+			$output.= '			},';
+			$output.= '			yAxis: {';
+			$output.= '				title: {';
+			$output.= '					text: "Innkjøp"';
+			$output.= '				},';
+			$output.= '				plotLines: [{';
+			$output.= '					value: 0,';
+			$output.= '					width: 1,';
+			$output.= '					color: "#808080"';
+			$output.= '				}]';
+			$output.= '			},';
+			$output.= '			series: [{';
+			$output.= '				name: "År",';
+			$output.= '				data: ['.$yAxis.']';
+			$output.= '			}]});});';
+			$output.= '</script>';
+		
+			$output.= '<div id="invoiceData" style="min-width: 110px; height: 300px; margin: 0 auto"></div>';
+			$output.= ' </div>';	
+			$output.= ' <div>Kilde Levand&oslash;rdatabasen</div>';
+			$output.= '<div class="info-box"><div class="inner-box">';
+			$output.= 'Datatilfanget er mindre for tidligere år enn inneværende år. Du kan derfor ikke nødvendigvis sammenligne år mot år.';
+			$output.= '</div></div>';
+                        
+                        
+			
+                
+                return $output;
+}

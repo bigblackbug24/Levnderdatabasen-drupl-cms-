@@ -1,0 +1,10 @@
+name = Kommunal Advance Search
+description = Kommunal Advance Search data
+package = Kommunal Modules
+core = 7.x
+
+version = "7.x-1.0"
+core = "7.x"
+
+scripts[] = js/jquery.tokenize.js
+stylesheets[all][] = css/jquery.tokenize.css

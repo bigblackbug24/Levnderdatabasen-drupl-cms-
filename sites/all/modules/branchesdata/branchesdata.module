@@ -1,0 +1,295 @@
+<?php
+	
+	function branchesdata_menu() 
+	{
+		$items = array();
+
+		$items['branchesdata'] = array(
+			'type' => MENU_CALLBACK,
+			'title' => t(''),
+			'page callback' => 'drupal_get_form',
+			'access arguments' => array('access content'),
+			'page arguments' => array('branches_data_filter_form'),
+		);
+		
+		$items['branchdata/%/%'] = array(
+			'type' => MENU_CALLBACK,
+			'title' => t(''),
+			'page callback' => 'getBranchData',
+			'access arguments' => array('access content'),
+			'page arguments' => array(2),
+		);
+		
+		return $items;	
+	}
+	
+	function branches_data_filter_form($form, &$form_state) 
+	{
+		
+		$form['#redirect'] = false;
+					
+		$dataYear = date('Y')-1;
+
+		for($i=2012; $i<=date('Y')- 1; $i++)
+		{
+			$yoptions[$i] = $i;
+		}
+				
+		$form['datayear'] = array(
+			'#type' => 'select',
+			'#title' => t('&Aring;r: '),
+			'#default_value' => $dataYear,
+			'#options' => $yoptions
+		);
+		
+		$subClassList = getGroupSubclassData(5);
+
+		$form['subsectorclass'] = array(
+			'#type' => 'select',
+			'#title' => t('Leverand&oslash;r SubSector:'),
+			'#default_value' => NULL,
+			'#options' => $subClassList,
+			'#id' => 'subctokenize',
+			'#attributes' => array('class' => array('tokenize-sample')),		
+		);
+				
+		$form['suppliername'] = array(
+        	'#type' => 'select',
+        	'#title' => t('Enter Leverand&oslash;r Navn'),
+			'#multiple' => TRUE,
+			'#default_value' => NULL,
+			'#id' => 'supplierid',	
+			'#attributes' => array('class' => array('tokenize-sample')),
+		);
+
+		$fkOptions = getFylkeKommuneList();
+		
+		$form['fkdropdown'] = array(
+			'#type' => 'select',
+			'#title' => t('Fylke / Kommune: '),
+			'#default_value' => NULL,
+			'#multiple' => TRUE,
+			'#options' => $fkOptions ,
+			'#id' => 'fktokenize',	
+			'#attributes' => array('class' => array('tokenize-sample')),	
+		);
+		
+		$form['submit'] = array(
+        	'#type'=>'submit',
+        	'#value'=>t('Submit'),
+			//'#ajax' => array(
+			//	'callback' => 'ajax_branches_data_filter_form',
+			//	'wrapper' => 'kommunalresult',
+			//	'method' => 'html',
+			//	'effect' => 'fade',
+			//),			
+      	);
+		
+		$form['reset'] = array('#markup' => '<input type="reset" value="Clear" name="clearbtn" />');
+
+		//$form['results_table'] = array(
+		//	'#markup' => '',
+		//	'#prefix' => '<div class="kommunalresult-right" id="kommunalresult">',
+		//	'#suffix' => '</div>',
+		//);
+		
+		
+		if (!empty($form_state['results_table'])) 
+		{
+			$form['results_table'] = array(
+											'#markup' => $form_state['results_table'],
+											'#prefix' => '<div class="kommunalresult-right" id="kommunalresult">',
+											'#suffix' => '</div>',
+
+										);
+		}
+				
+		return $form;
+		
+	}
+	
+	//function ajax_branches_data_filter_form($form, &$form_state)
+	
+	function branches_data_filter_form_submit($form, &$form_state)
+	{
+		$nDataYear = $form_state['values']['datayear'];
+		
+		$strBranchId = $form_state['values']['subsectorclass'];
+		
+		/////////////////////////////////////////////////////////////////////
+		
+		$arrFKId = $form_state['values']['fkdropdown'];
+		$strFKIDs = array();
+		foreach($arrFKId as $fkId)
+		{
+			if(empty($fkId))
+				continue;
+				
+			$arrFkId = explode('-', $fkId);
+			$strFKIDs[] = $arrFkId[1];
+		}		
+		
+		/////////////////////////////////////////////////////////////////////
+		
+		$strSupplierName = $form_state['values']['suppliername'];
+		
+		$strSubClassIDs = array();
+		foreach($strSupplierName as $strSuppID)
+		{
+			if(empty($strSuppID))
+				continue;
+				
+			$strSuppIDs[] = $strSuppID;
+		}	
+
+		/////////////////////////////////////////////////////////////////////
+		
+						
+		$htmlSupplierData = show_branches_data($strBranchId, $nDataYear, $strSuppIDs, $strFKIDs);
+	
+		//$form['results_table']['#markup'] = $htmlSupplierData;
+		//return $htmlSupplierData;
+	
+		
+		$form_state['results_table'] = $htmlSupplierData;
+		$form_state['rebuild'] = TRUE;
+		
+		
+	}
+	
+	
+	function getBranchData() 
+	{
+		$output = NULL;
+		
+		$branchId = arg(1);
+		$dataYear = arg(2);
+
+		$htmlData = show_branches_data($branchId, $dataYear );
+		
+		$output = '<div class="getUrlData">'.$htmlData.'</div>';
+		$output.= drupal_render(drupal_get_form('branches_data_filter_form'));
+		
+		return $output;		
+	}	
+	
+		
+	function branchesdata_theme() 
+	{
+		$items = array();
+				
+		$items['branches_data_filter_form'] = array(
+			'render element' => 'form',
+			'path' => drupal_get_path('theme', 'leverandors') . '/templates/forms',
+			'template' => 'branches_data_form',
+		);
+	
+		return $items;
+	}
+		
+	function show_branches_data($branchId, $dataYear, $suppiersIds, $kommuneId = NULL ) 
+	{
+		
+		db_set_active('kommunaldata');	
+		
+		// GET Yearly Invoices 
+		$query = db_select('leverandor_data', 'A');
+		$query->fields('A', array('ld_data_year', 'ld_subclass_name'));
+		$query->addExpression('SUM(ld_revenue)', 'totalRevenue');
+		$query->addExpression('count(ld_revenue)', 'totalKommunes');
+
+		$query->condition('A.ld_subclass', $branchId, '=');	
+		$query->groupBy('A.ld_data_year');
+		$arrGraphData = $query->execute()->fetchAll();
+
+		db_set_active();
+		
+		$branchNavn = NULL;
+		
+		foreach($arrGraphData as $rowData)
+		{
+			$branchNavn = $rowData->ld_subclass_name;		
+		}
+		
+		$output = NULL;
+							
+		$output.= '<div class="right-content">';
+		$output.= '	<div class="logo-widget">';
+		$output.= '		<h1>'.$branchNavn.'</h1>';
+		$output.= '	</div>';
+
+		$output.= '<table class="table-view" cellpadding="0" cellspacing="0" width="50%">';
+		$output.= '		<thead>';
+		$output.= '			<tr>';
+		$output.= '				<th width="33%"> &Aring;r </th>';
+		$output.= '				<th width="33%" class="rightalign"> Totalt Revenue</th>';
+		$output.= '				<th width="33%" class="rightalign"> Total Fylke/Kommune</th>';
+		$output.= '			</tr>';
+		$output.= '		</thead>';
+		$output.= '	<tbody>';
+			
+		db_set_active('kommunaldata');	
+		
+		// GET Yearly Invoices 
+		$query = db_select('leverandor_data', 'A');
+		$query->fields('A', array('ld_data_year', 'ld_subclass_name'));
+		$query->addExpression('SUM(ld_revenue)', 'totalRevenue');
+		$query->addExpression('count(ld_revenue)', 'totalKommunes');
+
+		$query->condition('A.ld_subclass', $branchId, '=');	
+		$query->groupBy('A.ld_data_year');
+		
+		$arrGraphData = $query->execute()->fetchAll();
+
+		db_set_active();
+
+		foreach($arrGraphData as $rowData)
+		{			
+			$output.= '<tr '.$bgcolor.' >';
+			$output.= '	<td>'.$rowData->ld_data_year.'</td>';
+			$output.= '	<td class="rightalign">'.numberFormat($rowData->totalRevenue).'</td>';
+			$output.= '	<td class="rightalign">'.$rowData->totalKommunes.'</td>';
+			$output.= '</tr>';
+			
+			$xAxis.= $rowData->ld_data_year.',';
+			$yAxis.= $rowData->totalRevenue.',';
+		}
+		
+		$output.= '	</tbody>';
+		$output.= '	</table>';
+
+		$output.= '<script>';
+		$output.= '	$( document ).ready(function() {';
+		$output.= '		$("#leverandorInvoice").highcharts({';
+		$output.= '			title: {';
+		$output.= '				text: "'.$branchNavn.' Revenue",';
+		$output.= '				x: -20';
+		$output.= '			},';
+		$output.= '			xAxis: {';
+		$output.= '				categories: ['.$xAxis.']';
+		$output.= '			},';
+		$output.= '			yAxis: {';
+		$output.= '				title: {';
+		$output.= '					text: "Revenue"';
+		$output.= '				},';
+		$output.= '				plotLines: [{';
+		$output.= '					value: 0,';
+		$output.= '					width: 1,';
+		$output.= '					color: "#808080"';
+		$output.= '				}]';
+		$output.= '			},';
+		$output.= '			series: [{';
+		$output.= '				name: "Years",';
+		$output.= '				data: ['.$yAxis.']';
+		$output.= '			}]});});';
+		$output.= '</script>';
+	
+		$output.= '<div id="leverandorInvoice" style="min-width: 110px; height: 300px; margin: 0 auto"></div>';
+							
+		
+		
+					
+		return $output;
+	}
+	
+	

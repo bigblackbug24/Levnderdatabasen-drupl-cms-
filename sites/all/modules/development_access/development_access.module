@@ -1,0 +1,63 @@
+<?php
+	
+	function development_access_menu() 
+	{
+		$items = array();
+
+		$items['underdevelopment'] = array(
+			'title' => t('Authorization'),
+			'page callback' => 'underdevelopment_callback_func',
+			'access arguments' => array('access content'),
+		);
+		
+		return $items;	
+	}
+
+
+	function underdevelopment_callback_func() 
+	{
+	 	
+	 	$output = NULL;
+
+	 	$output = '<div>Al contrario di quanto si pensi, Lorem Ipsum non è semplicemente una sequenza casuale di caratteri. Risale ad un classico della letteratura latina del 45 AC, cosa che lo rende vecchio di 2000 anni. Richard McClintock, professore di latino al Hampden-Sydney College in Virginia, ha ricercato una delle più oscure parole latine, consectetur, da un passaggio del Lorem Ipsum e ha scoperto tra i vari testi in cui è citata, la fonte da cui è tratto il tes<div><br><br>';
+	  	
+		$output.= '<form name="frmValid" action="" method="post">';
+		$output.= '<input type="text" name="valid" value="" />';
+
+		$output.= '<input type="submit" name="Access" value="Access" />';
+		$output.= '</form>';
+
+	  	return $output;
+
+	  	//exit();	
+
+	  }
+
+	
+	//function development_access_init() 
+
+	function development_access_boot()  
+	{
+
+	/*	$sessionValue = $_SESSION['accesscode'];
+		header('Location: underdevelopment');
+		
+		exit;*/
+
+
+		//global $base_url;
+
+		//header('Location: underdevelopment');
+		
+
+
+		//drupal_goto('<front>');
+
+			// drupal_goto('underdevelopment');
+
+//		if (strpos($sessionValue, 'kommunaldrupal') !== true) {
+//			drupal_goto('underdevelopment');
+//		}	
+	}
+?>
+
